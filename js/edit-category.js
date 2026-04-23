@@ -1,0 +1,237 @@
+import {
+  db, requireAuth, getRestaurantId, getRestaurantName,
+  handleLogout, showToast, compressImage, bindPreview
+} from "./firebase.js";
+
+import {
+  collection, getDocs, doc, onSnapshot, updateDoc, deleteDoc, query, orderBy
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+await requireAuth();
+document.getElementById("logoutBtn").addEventListener("click", handleLogout);
+
+const restaurantId = await getRestaurantId();
+const name         = await getRestaurantName();
+document.getElementById("restaurantLabel").textContent = name || "My Restaurant";
+
+// URL params
+const params     = new URLSearchParams(window.location.search);
+const categoryId = params.get("id");
+const catName    = params.get("name") || "Category";
+
+if (!categoryId) window.location.href = "./edit-menu.html";
+
+document.getElementById("pageTitle").textContent       = catName;
+document.getElementById("topbarTitle").textContent     = catName;
+document.getElementById("breadcrumbName").textContent  = catName;
+
+bindPreview("editImage", "editPreview");
+
+// ── Logo / brand color sync ────────────────────────────────────────────────────
+function showLogoPreview(src) {
+  const preview = document.getElementById("logoPreview");
+  const icon    = document.getElementById("logoIcon");
+  preview.src = src; preview.style.display = "block"; icon.style.display = "none";
+}
+document.getElementById("logoInput").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file || !restaurantId) return;
+  showToast("Uploading logo...");
+  try {
+    const base64 = await compressImage(file, 300);
+    await updateDoc(doc(db, "restaurants", restaurantId), { logo: base64 });
+    showLogoPreview(base64);
+    showToast("Logo saved! ✅");
+  } catch (err) { showToast("Failed to save logo: " + err.message, true); }
+});
+if (restaurantId) {
+  onSnapshot(doc(db, "restaurants", restaurantId), (snap) => {
+    if (!snap.exists()) return;
+    const data = snap.data();
+    if (data.logo) showLogoPreview(data.logo);
+    if (data.brandColor) {
+      const dot = document.getElementById("colorDot");
+      if (dot) dot.style.background = data.brandColor;
+    }
+  });
+}
+
+// ── Load items ─────────────────────────────────────────────────────────────────
+async function loadItems() {
+  if (!restaurantId || !categoryId) return;
+
+  const snap = await getDocs(
+    query(
+      collection(db, "restaurants", restaurantId, "categories", categoryId, "menu_items"),
+      orderBy("createdAt", "desc")
+    )
+  );
+
+  const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  window._itemsCache = items;
+  const list  = document.getElementById("itemList");
+  const chip  = document.getElementById("itemCountChip");
+  if (chip) chip.textContent = items.length;
+
+  if (!items.length) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <span class="empty-icon">🍽️</span>
+        <span class="empty-title">No items in this category</span>
+        <span class="empty-hint">Add dishes from the Menu Items page</span>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = items.map((item, i) => {
+    const isAvailable = item.available !== false;
+    return `
+      <div class="item-row ${isAvailable ? "" : "unavailable"}" style="animation: fadeUp 0.3s ease ${i * 0.04}s forwards; opacity:0;">
+        <img class="item-img" src="${item.image}" alt="${item.name}" loading="lazy" />
+        <div class="item-info">
+          <div class="item-name">${item.name}</div>
+          <div class="item-price">₹${item.price}</div>
+          <span class="status-badge ${isAvailable ? "available" : "unavailable"}">
+            ${isAvailable ? "● Available" : "● Unavailable"}
+          </span>
+        </div>
+        <div class="manage-actions">
+         <button class="action-btn edit" title="Edit"
+  onclick="openEdit('${item.id}')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+         <button class="action-btn toggle ${isAvailable ? "on" : ""}"
+  style="width:auto; padding:0 10px; font-size:0.72rem; font-weight:600;"
+  title="${isAvailable ? "Mark unavailable" : "Mark available"}"
+  onclick="toggleItem('${item.id}', ${isAvailable})">
+           ${isAvailable ? "Mark Unavailable" : "Mark Available"}
+          </button>
+          <button class="action-btn del" title="Delete"
+            onclick="confirmDelete('${item.id}', '${item.name.replace(/'/g,"\\'")}')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          </button>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+// ── Toggle ─────────────────────────────────────────────────────────────────────
+window.toggleItem = async (id, currentlyAvailable) => {
+  if (!restaurantId) return;
+  try {
+    await updateDoc(
+      doc(db, "restaurants", restaurantId, "categories", categoryId, "menu_items", id),
+      { available: !currentlyAvailable }
+    );
+    showToast(currentlyAvailable ? "Marked as unavailable" : "Marked as available ✅");
+    await loadItems();
+  } catch (err) { showToast("Failed to update: " + err.message, true); }
+};
+
+// ── Delete ─────────────────────────────────────────────────────────────────────
+let _pendingDelete = null;
+
+window.confirmDelete = (id, itemName) => {
+  _pendingDelete = { id };
+  document.getElementById("deleteMsg").textContent = `"${itemName}" will be permanently deleted.`;
+  document.getElementById("deleteModal").classList.add("open");
+};
+
+document.getElementById("deleteCancelBtn").addEventListener("click", () => {
+  document.getElementById("deleteModal").classList.remove("open");
+  _pendingDelete = null;
+});
+document.getElementById("deleteModalBg").addEventListener("click", () => {
+  document.getElementById("deleteModal").classList.remove("open");
+  _pendingDelete = null;
+});
+
+document.getElementById("deleteConfirmBtn").addEventListener("click", async () => {
+  if (!_pendingDelete || !restaurantId) return;
+  const btn = document.getElementById("deleteConfirmBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Deleting...';
+  try {
+    await deleteDoc(
+      doc(db, "restaurants", restaurantId, "categories", categoryId, "menu_items", _pendingDelete.id)
+    );
+    showToast("Item deleted 🗑️");
+    document.getElementById("deleteModal").classList.remove("open");
+    _pendingDelete = null;
+    await loadItems();
+  } catch (err) {
+    showToast("Failed to delete: " + err.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = "Delete";
+  }
+});
+
+// ── Edit ───────────────────────────────────────────────────────────────────────
+let _editId = null;
+
+window.openEdit = (id) => {
+  const item = (window._itemsCache || []).find(i => i.id === id);
+  if (!item) return;
+  _editId = id;
+  document.getElementById("editName").value  = item.name;
+  document.getElementById("editPrice").value = item.price;
+  document.getElementById("editDesc").value  = item.description || "";
+  document.getElementById("editDescCounter").textContent = `${(item.description || "").length} / 150`;
+  document.getElementById("editImage").value = "";
+  document.getElementById("editPreview").style.display = "none";
+  document.getElementById("editModal").classList.add("open");
+};
+
+document.getElementById("editDesc").addEventListener("input", () => {
+  const len = document.getElementById("editDesc").value.length;
+  const counter = document.getElementById("editDescCounter");
+  counter.textContent = `${len} / 150`;
+  counter.style.color = len >= 140 ? "var(--red)" : "var(--muted)";
+});
+
+
+
+document.getElementById("editModalClose").addEventListener("click", () => {
+  document.getElementById("editModal").classList.remove("open");
+  _editId = null;
+});
+document.getElementById("editModalBg").addEventListener("click", () => {
+  document.getElementById("editModal").classList.remove("open");
+  _editId = null;
+});
+
+document.getElementById("editSaveBtn").addEventListener("click", async () => {
+  const newName  = document.getElementById("editName").value.trim();
+  const newPrice = document.getElementById("editPrice").value;
+  const file     = document.getElementById("editImage").files[0];
+
+  if (!newName)                           return showToast("Please enter a name", true);
+  if (!newPrice || Number(newPrice) <= 0) return showToast("Please enter a valid price", true);
+  if (!_editId || !restaurantId)          return;
+
+  const btn = document.getElementById("editSaveBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Saving...';
+
+  try {
+   const newDesc = document.getElementById("editDesc").value.trim();
+const updateData = { name: newName, price: Number(newPrice), description: newDesc };
+    if (file) updateData.image = await compressImage(file, 400);
+    await updateDoc(
+      doc(db, "restaurants", restaurantId, "categories", categoryId, "menu_items", _editId),
+      updateData
+    );
+    showToast(`"${newName}" updated ✅`);
+    document.getElementById("editModal").classList.remove("open");
+    _editId = null;
+    await loadItems();
+  } catch (err) {
+    showToast("Failed to save: " + err.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = "Save Changes";
+  }
+});
+
+await loadItems();
