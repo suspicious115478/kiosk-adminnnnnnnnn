@@ -28,14 +28,14 @@ function showLogoPreview(src) {
 document.getElementById("logoInput").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file || !restaurantId) return;
-  showToast("Logo upload ho raha hai...");
+  showToast("Uploading logo...");
   try {
     const base64 = await compressImage(file, 300);
     await updateDoc(doc(db, "restaurants", restaurantId), { logo: base64 });
     showLogoPreview(base64);
-    showToast("Logo save ho gaya! ✅");
+    showToast("Logo saved! ✅");
   } catch (err) {
-    showToast("Logo save nahi hua: " + err.message, true);
+    showToast("Failed to save logo: " + err.message, true);
   }
 });
 
@@ -91,7 +91,7 @@ function rowHTML(uid) {
           class="row-desc"
           id="desc_${uid}"
           maxlength="150"
-          placeholder="Dish ki chhoti si description (optional)..."
+          placeholder="Short description of the dish (optional)..."
           rows="2"
         ></textarea>
       </div>
@@ -229,7 +229,7 @@ if (restaurantId) {
       const warning   = document.getElementById("noCatWarning");
 
       if (snap.empty) {
-        select.innerHTML         = '<option value="">— Pehle category banao —</option>';
+        select.innerHTML         = '<option value="">— Create a category first —</option>';
         warning.style.display    = "flex";
         uploadBtn.disabled       = true;
         addRowBtn.disabled       = true;
@@ -241,7 +241,7 @@ if (restaurantId) {
       addRowBtn.disabled    = false;
 
       select.innerHTML =
-        '<option value="">— Category select karo —</option>' +
+        '<option value="">— Select a category —</option>' +
         snap.docs.map(d =>
           `<option value="${d.id}" data-name="${d.data().name}">${d.data().name}</option>`
         ).join("");
@@ -328,8 +328,8 @@ function renderItems() {
     list.innerHTML = `
       <div class="empty-state">
         <span class="empty-icon">🍽️</span>
-        <span class="empty-title">${activeFilter === "all" ? "Koi item nahi hai abhi" : "Is category mein koi item nahi"}</span>
-        <span class="empty-hint">Left side form se dish add karo</span>
+        <span class="empty-title">${activeFilter === "all" ? "No items yet" : "No items in this category"}</span>
+        <span class="empty-hint">Add a dish using the form on the left</span>
       </div>`;
     return;
   }
@@ -353,7 +353,7 @@ function renderItems() {
 // ── Upload all items ──────────────────────────────────────────────────────────
 document.getElementById("uploadItemBtn").addEventListener("click", async () => {
   const categoryId = document.getElementById("itemCategory").value;
-  if (!categoryId) return showToast("Category select karo", true);
+  if (!categoryId) return showToast("Please select a category", true);
 
   const selectedOption = document.getElementById("itemCategory").selectedOptions[0];
   const categoryName   = selectedOption.dataset.name || selectedOption.text;
@@ -369,9 +369,9 @@ document.getElementById("uploadItemBtn").addEventListener("click", async () => {
     const file  = row.querySelector(".row-img-input").files[0];
     const rowNum = row.querySelector(".row-num").textContent;
 
-    if (!name)                      return showToast(`${rowNum}: naam daalo`, true);
-    if (!price || Number(price) <= 0) return showToast(`${rowNum}: sahi price daalo`, true);
-    if (!file)                      return showToast(`${rowNum}: image select karo`, true);
+    if (!name)                        return showToast(`${rowNum}: please enter a name`, true);
+    if (!price || Number(price) <= 0) return showToast(`${rowNum}: please enter a valid price`, true);
+    if (!file)                        return showToast(`${rowNum}: please select an image`, true);
 
     items.push({ name, price: Number(price), desc, file });
   }
@@ -383,7 +383,7 @@ document.getElementById("uploadItemBtn").addEventListener("click", async () => {
 
   let uploaded = 0;
   try {
-    if (!restaurantId) return showToast("Restaurant nahi mila", true);
+    if (!restaurantId) return showToast("Restaurant not found", true);
 
     for (const item of items) {
       const image = await compressImage(item.file, 400);
@@ -403,11 +403,11 @@ document.getElementById("uploadItemBtn").addEventListener("click", async () => {
       uploaded++;
     }
 
-    showToast(`${uploaded} item${uploaded > 1 ? "s" : ""} upload ho ${uploaded > 1 ? "gaye" : "gaya"}! 🍽️`);
+    showToast(`${uploaded} item${uploaded > 1 ? "s" : ""} uploaded successfully! 🍽️`);
     resetRows();
 
   } catch (e) {
-    showToast(e.message || "Error aaya", true);
+    showToast(e.message || "An error occurred", true);
   } finally {
     btn.disabled = false;
     btn.innerHTML = `

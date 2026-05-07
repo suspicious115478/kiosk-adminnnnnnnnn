@@ -264,7 +264,7 @@ if (restaurantId) {
 
 // ── Save to Firestore ─────────────────────────────────────────────────────────
 document.getElementById("saveColorBtn").addEventListener("click", async () => {
-  if (!restaurantId) return showToast("Restaurant nahi mila", true);
+  if (!restaurantId) return showToast("Restaurant not found", true);
 
   const btn = document.getElementById("saveColorBtn");
   btn.disabled = true;
@@ -275,9 +275,9 @@ document.getElementById("saveColorBtn").addEventListener("click", async () => {
       brandColor: currentHex
     });
     showSavedIndicator(currentHex);
-    showToast(`Brand color save ho gaya! ${currentHex} ✅`);
+   showToast(`Brand color saved successfully! ${currentHex} ✅`);
   } catch (err) {
-    showToast("Save nahi hua: " + err.message, true);
+    showToast("Failed to save: " + err.message, true);
   } finally {
     btn.disabled = false;
     btn.innerHTML = `

@@ -28,14 +28,14 @@ function showLogoPreview(src) {
 document.getElementById("logoInput").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file || !restaurantId) return;
-  showToast("Logo upload ho raha hai...");
+  showToast("Uploading logo...");
   try {
     const base64 = await compressImage(file, 300);
     await updateDoc(doc(db, "restaurants", restaurantId), { logo: base64 });
     showLogoPreview(base64);
-    showToast("Logo save ho gaya! ✅");
+    showToast("Logo saved! ✅");
   } catch (err) {
-    showToast("Logo save nahi hua: " + err.message, true);
+    showToast("Failed to save logo: " + err.message, true);
   }
 });
 
@@ -118,8 +118,8 @@ function renderCategories(categories) {
     grid.innerHTML = `
       <div class="empty-state">
         <span class="empty-icon">📂</span>
-        <span class="empty-title">Koi category nahi hai abhi</span>
-        <span class="empty-hint">Left side form se pehli category add karo</span>
+        <span class="empty-title">No categories yet</span>
+        <span class="empty-hint"> Add your first category using the form on the left</span>
       </div>`;
     return;
   }
@@ -144,8 +144,8 @@ document.getElementById("saveCatBtn").addEventListener("click", async () => {
   const catName = document.getElementById("catName").value.trim();
   const file    = catImageInput.files[0];
 
-  if (!catName) return showToast("Category name daalo", true);
-  if (!file)    return showToast("Image select karo", true);
+  if (!catName) return showToast("Please enter a category name", true);
+  if (!file)    return showToast("Please select an image", true);
 
   const btn = document.getElementById("saveCatBtn");
   btn.disabled = true;
@@ -153,7 +153,7 @@ document.getElementById("saveCatBtn").addEventListener("click", async () => {
 
   try {
     const image = await compressImage(file, 600);
-    if (!restaurantId) return showToast("Restaurant nahi mila", true);
+    if (!restaurantId) return showToast("Restaurant not found", true);
 
     await addDoc(collection(db, "restaurants", restaurantId, "categories"), {
       name: catName,
@@ -162,7 +162,7 @@ document.getElementById("saveCatBtn").addEventListener("click", async () => {
       createdAt: Date.now()
     });
 
-    showToast(`"${catName}" save ho gayi! ✅`, false);
+    showToast(`"${catName}" saved! ✅`, false);
 
     // Reset form
     document.getElementById("catName").value = "";
@@ -172,7 +172,7 @@ document.getElementById("saveCatBtn").addEventListener("click", async () => {
     fileDrop.style.display    = "flex";
 
   } catch (e) {
-    showToast(e.message || "Error aaya", true);
+    showToast(e.message || "Something went wrong", true);
   } finally {
     btn.disabled = false;
     btn.innerHTML = `

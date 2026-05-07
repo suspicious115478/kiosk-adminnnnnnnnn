@@ -92,7 +92,7 @@ function renderOtherCharges() {
   list.innerHTML = "";
 
   if (!otherCharges.length) {
-    list.innerHTML = `<div class="other-charges-empty">Koi extra charge nahi — "Add Charge" se add karo</div>`;
+    list.innerHTML = `<div class="other-charges-empty">No additional charges — click "Add Charge" to add one</div>`;
     return;
   }
 
@@ -115,7 +115,7 @@ function renderOtherCharges() {
     const nameInput = document.createElement("input");
     nameInput.type        = "text";
     nameInput.className   = "other-charge-name";
-    nameInput.placeholder = "Charge naam (e.g. Packaging)";
+    nameInput.placeholder = "Charge name (e.g. Packaging)";
     nameInput.value       = charge.name;
     nameInput.addEventListener("input", () => { otherCharges[idx].name = nameInput.value; });
 
@@ -265,7 +265,7 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
   try {
     await setDoc(taxesDocRef(), taxData, { merge: true });
     saveHint.textContent = "✓ Saved successfully";
-    showToast("Taxes save ho gaye! ✅");
+   showToast("Taxes saved successfully! ✅");
     setTimeout(() => { saveHint.textContent = ""; }, 3000);
   } catch (err) {
     showToast("Save failed: " + err.message, true);

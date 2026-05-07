@@ -162,16 +162,16 @@ saveBtn.addEventListener("click", async () => {
 
   // Validation
   if (!keyId) {
-    showToast("Key ID daalna zaroori hai", true); return;
+   showToast("Key ID is required", true); return;
   }
   if (currentMode === "test" && !keyId.startsWith("rzp_test_")) {
-    showToast("Test mode mein Key ID rzp_test_ se shuru honi chahiye", true); return;
+     showToast("In test mode, Key ID must start with rzp_test_", true);return;
   }
   if (currentMode === "live" && !keyId.startsWith("rzp_live_")) {
-    showToast("Live mode mein Key ID rzp_live_ se shuru honi chahiye", true); return;
+   showToast("In live mode, Key ID must start with rzp_live_", true); return;
   }
   if (!upiId) {
-    showToast("UPI ID (VPA) daalna zaroori hai", true); return;
+   showToast("UPI ID (VPA) is required", true); return;
   }
 
   saveBtn.disabled = true;
@@ -198,7 +198,7 @@ saveBtn.addEventListener("click", async () => {
       { merge: true }
     );
 
-    showToast("Payment settings save ho gayi! ✅");
+  showToast("Payment settings saved successfully! ✅");
     keySecretInput.value = "";
     keySecretInput.placeholder = "••••••••• (saved — enter new to change)";
     testBtn.style.display = "flex";
@@ -210,7 +210,7 @@ saveBtn.addEventListener("click", async () => {
     updateStatusCard(snap.data());
 
   } catch (err) {
-    showToast("Save nahi hua: " + err.message, true);
+    showToast("Save failed: " + err.message, true);
   } finally {
     saveBtn.disabled = false;
     saveBtn.innerHTML = `
@@ -232,7 +232,7 @@ testBtn.addEventListener("click", async () => {
     );
 
     if (!snap.exists() || !snap.data().keyId) {
-      showToast("Pehle keys save karo", true);
+    showToast("Please save the keys first", true);
       return;
     }
 
@@ -242,12 +242,12 @@ testBtn.addEventListener("click", async () => {
       : keyId.startsWith("rzp_live_");
 
     if (!isValidFormat) {
-      showToast(`Key ID format galat hai — ${mode} ke liye rzp_${mode}_ se start hona chahiye`, true);
+   showToast(`Invalid Key ID format — it must start with rzp_${mode}_ for ${mode} mode`, true);
       return;
     }
 
     // Format valid hai
-    showToast(`✅ Key ID format valid hai (${mode} mode). Full test order ke baad confirm hoga.`);
+  showToast(`✅ Key ID format is valid (${mode} mode). Full verification requires a test order.`);
 
   } catch (err) {
     showToast("Test failed: " + err.message, true);
@@ -261,7 +261,7 @@ testBtn.addEventListener("click", async () => {
 
 // ── Clear keys ────────────────────────────────────────────────────────────────
 clearBtn.addEventListener("click", async () => {
-  const confirmed = confirm("Kya aap sach mein payment keys delete karna chahte hain? Kiosk pe payments band ho jaengi.");
+  const confirmed = confirm("Are you sure you want to delete the payment keys? Payments will be disabled on the kiosk.");
   if (!confirmed) return;
 
   try {
@@ -275,8 +275,8 @@ clearBtn.addEventListener("click", async () => {
     keySecretInput.placeholder = "••••••••••••••••••••";
     testBtn.style.display = "none";
     updateStatusCard(null);
-    showToast("Keys delete ho gayi");
+   showToast("Keys deleted successfully");
   } catch (err) {
-    showToast("Delete nahi hua: " + err.message, true);
+   showToast("Delete failed: " + err.message, true);
   }
 });
