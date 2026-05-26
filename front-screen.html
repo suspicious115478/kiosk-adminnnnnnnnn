@@ -439,14 +439,14 @@
         Taxes & Charges
       </a>
 
-      <span class="nav-section-label" style="margin-top:8px;">Kiosk</span>
+      <!-- <span class="nav-section-label" style="margin-top:8px;">Kiosk</span>
 
       <a href="./front-screen.html" class="sidebar-link active">
         <span class="slink-icon">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
         </span>
         Front Screen
-      </a>
+      </a> -->
     </nav>
 
     <div class="sidebar-bottom">
@@ -479,12 +479,12 @@
           Kiosk Editor
         </div>
       </div>
-      <div class="topbar-right">
+      <!-- <div class="topbar-right">
         <button id="saveAllBtn" class="btn-save">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
           Save Everything
         </button>
-      </div>
+      </div> -->
     </div>
 
     <!-- Content -->
@@ -592,100 +592,7 @@
 
 <div class="toast" id="toast"></div>
 
-<script>
-  // ── Ribbon live preview ──
-  const ribbonInput = document.getElementById("ribbonInput");
-  const ribbonItems = document.getElementById("ribbonItems");
-  const wordCount   = document.getElementById("wordCount");
-
-  function updateRibbonPreview() {
-    const raw   = ribbonInput.value;
-    const items = raw.split(",").map(i => i.trim()).filter(Boolean);
-    const count = items.length;
-
-    wordCount.textContent = `${count} / 12 items`;
-    wordCount.classList.toggle("over", count > 12);
-
-    if (!items.length) {
-      ribbonItems.innerHTML = `<span class="ribbon-item"><span class="ribbon-sep">✦</span> Add items above to see preview</span>`;
-      return;
-    }
-    // Duplicate for seamless scroll
-    const doubled = [...items, ...items];
-    ribbonItems.innerHTML = doubled
-      .map(item => `<span class="ribbon-item"><span class="ribbon-sep">✦</span> ${item}</span>`)
-      .join("");
-  }
-
-  ribbonInput.addEventListener("input", updateRibbonPreview);
-
-  // ── Hero upload ──
-  const heroDropZone    = document.getElementById("heroDropZone");
-  const heroInput       = document.getElementById("heroInput");
-  const heroPreview     = document.getElementById("heroPreview");
-  const uploadPlaceholder = document.getElementById("uploadPlaceholder");
-  const changeHeroBtn   = document.getElementById("changeHeroBtn");
-
-  heroDropZone.addEventListener("click", () => heroInput.click());
-  changeHeroBtn.addEventListener("click", (e) => { e.stopPropagation(); heroInput.click(); });
-
-  heroInput.addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      heroPreview.src = ev.target.result;
-      heroPreview.style.display = "block";
-      uploadPlaceholder.style.display = "none";
-      changeHeroBtn.style.display = "flex";
-    };
-    reader.readAsDataURL(file);
-  });
-
-  // drag & drop
-  heroDropZone.addEventListener("dragover", (e) => { e.preventDefault(); heroDropZone.classList.add("dragover"); });
-  heroDropZone.addEventListener("dragleave", () => heroDropZone.classList.remove("dragover"));
-  heroDropZone.addEventListener("drop", (e) => {
-    e.preventDefault(); heroDropZone.classList.remove("dragover");
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith("image/")) {
-      const dt = new DataTransfer(); dt.items.add(file);
-      heroInput.files = dt.files; heroInput.dispatchEvent(new Event("change"));
-    }
-  });
-
-  // ── Toast ──
-  function showToast(msg, isError = false) {
-    const t = document.getElementById("toast");
-    t.textContent = msg;
-    t.className = "toast show" + (isError ? " error" : " success");
-    clearTimeout(t._tid);
-    t._tid = setTimeout(() => t.className = "toast", 3000);
-  }
-
-  // ── Save (both buttons) ──
-  function handleSave(btn) {
-    const items = ribbonInput.value.split(",").filter(i => i.trim() !== "");
-    if (items.length > 12) { showToast("Please limit to 12 items", true); return; }
-    if (!heroPreview.src || heroPreview.style.display === "none") {
-      showToast("Please upload a hero image", true); return;
-    }
-
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Saving...';
-
-    // Hook into your firebase.js module here:
-    // import { ... } from "./firebase.js" — wiring left for your JS module
-    setTimeout(() => {
-      showToast("Front Screen updated successfully! ✅");
-      btn.disabled = false;
-      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save Everything`;
-    }, 1200);
-  }
-
-  document.getElementById("saveAllBtn").addEventListener("click", function() { handleSave(this); });
-  document.getElementById("saveFooterBtn").addEventListener("click", function() { handleSave(this); });
-</script>
+<script type="module" src="./js/front-screen.js"></script>
 
 <!-- Replace this block with: <script type="module" src="./js/front-screen.js"></script> -->
 </body>

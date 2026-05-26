@@ -159,6 +159,12 @@
   min-height: 38px;
 }
 
+.tax-field-row-divided {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  margin-top: -4px;
+}
+
 /* ── OTHER CHARGES LIST ── */
 .other-charges-list { display: flex; flex-direction: column; gap: 8px; }
 

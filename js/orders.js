@@ -231,7 +231,7 @@ function buildOrderCard(order, isNew, index) {
     <div class="order-item-row">
       <span class="order-item-qty">×${item.qty ?? item.quantity ?? 1}</span>
       <span class="order-item-name">${item.name}</span>
-      <span class="order-item-price">₹${Math.round((item.price ?? 0) * (item.qty ?? item.quantity ?? 1))}</span>
+<span class="order-item-price">₹${((item.price ?? 0) * (item.qty ?? item.quantity ?? 1)).toFixed(2)}</span>
     </div>
   `).join("");
 
@@ -259,7 +259,7 @@ function buildOrderCard(order, isNew, index) {
       </div>
       <div class="order-footer">
         <span class="order-time">${timeStr}</span>
-        <span class="order-total">₹${Math.round(total)}</span>
+<span class="order-total">₹${(total).toFixed(2)}</span>
       </div>
     </div>`;
 }
@@ -267,8 +267,8 @@ function buildOrderCard(order, isNew, index) {
 // ── Summary bar ───────────────────────────────────────────────────────────────
 function updateSummary(orders) {
   document.getElementById("sumTotal").textContent   = orders.length;
-  document.getElementById("sumRevenue").textContent =
-    "₹" + Math.round(orders.reduce((s, o) => s + (o.totalPrice || 0), 0));
+document.getElementById("sumRevenue").textContent =
+  "₹" + orders.reduce((s, o) => s + (o.totalPrice || 0), 0).toFixed(2);
   document.getElementById("sumNew").textContent  = orders.filter(o => o.status === "NEW").length;
   document.getElementById("sumDone").textContent = orders.filter(o => o.status === "COMPLETED").length;
 }

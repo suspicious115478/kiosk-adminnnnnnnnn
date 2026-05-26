@@ -478,6 +478,16 @@ body::before {
   line-height: 1.55;
 }
 
+.sidebar-link.active {
+  background: rgba(200, 131, 26, 0.12);
+  color: var(--accent);
+}
+.sidebar-link.active .slink-icon {
+  background: rgba(200, 131, 26, 0.15);
+  border: 1px solid rgba(200, 131, 26, 0.2);
+  color: var(--accent);
+}
+
 /* accent strips */
 .ac-cat   { border-top: 3px solid var(--cat-clr);  }
 .ac-menu  { border-top: 3px solid var(--dish-clr); }

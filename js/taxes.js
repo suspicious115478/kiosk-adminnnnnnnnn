@@ -235,6 +235,42 @@ async function loadTaxes() {
 document.getElementById("saveBtn").addEventListener("click", async () => {
   const saveBtn  = document.getElementById("saveBtn");
   const saveHint = document.getElementById("saveHint");
+  // ── Validation ────────────────────────────────────────────────
+const taxVal = parseFloat(document.getElementById("taxPercent").value);
+if (isNaN(taxVal) || taxVal < 0 || taxVal > 100) {
+  showToast("Tax % must be between 0 and 100", true); return;
+}
+if (serviceToggle.checked) {
+  const sv = parseFloat(document.getElementById("serviceValue").value);
+  if (isNaN(sv) || sv <= 0) {
+    showToast("Service charge value must be greater than 0", true); return;
+  }
+  if (serviceType === "percent" && sv > 100) {
+    showToast("Service charge % cannot exceed 100", true); return;
+  }
+}
+if (packingToggle.checked) {
+  const pv = parseFloat(document.getElementById("packingValue").value);
+  if (isNaN(pv) || pv <= 0) {
+    showToast("Packing charge value must be greater than 0", true); return;
+  }
+  if (packingType === "percent" && pv > 100) {
+    showToast("Packing charge % cannot exceed 100", true); return;
+  }
+}
+for (let i = 0; i < otherCharges.length; i++) {
+  const oc = otherCharges[i];
+  if (!oc.name.trim()) {
+    showToast(`Other charge #${i + 1}: name cannot be empty`, true); return;
+  }
+  if (isNaN(oc.value) || oc.value <= 0) {
+    showToast(`"${oc.name || `Charge #${i+1}`}": value must be > 0`, true); return;
+  }
+  if (oc.type === "percent" && oc.value > 100) {
+    showToast(`"${oc.name}": % cannot exceed 100`, true); return;
+  }
+}
+// ── End Validation ────────────────────────────────────────────
   saveBtn.disabled     = true;
   saveBtn.textContent  = "Saving...";
   saveHint.textContent = "";
