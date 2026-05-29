@@ -331,16 +331,15 @@ document.getElementById("applyBtn").addEventListener("click", async () => {
     );
 
     // 2️⃣ Restaurant node mein discountedItemIds sync karo
-    await syncDiscountedItemIds("add", {
+   await syncDiscountedItemIds("add", {
       itemId:          selectedItem.id,
       categoryId:      selectedItem.categoryId,
       name:            selectedItem.name,
-      image:           selectedItem.image || "",
       price:           selectedItem.price,
       discountedPrice: val,
       discountPercent: pct
     });
-
+    
     showToast(`Discount applied! ₹${selectedItem.price} → ₹${val} (-${pct}%) ✅`);
   } catch (e) {
     showToast("Failed to apply discount: " + e.message, true);
@@ -441,3 +440,35 @@ clearSearch.addEventListener("click", () => {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadAllItems();
+
+// ── Ad discount % ─────────────────────────────────────────────────────────────
+async function loadAdDiscount() {
+  if (!restaurantId) return;
+  const snap = await getDoc(doc(db, "restaurants", restaurantId));
+  if (snap.exists() && snap.data().discount_p_ad != null)
+    document.getElementById("adDiscInput").value = snap.data().discount_p_ad;
+}
+
+document.getElementById("saveAdDiscBtn").addEventListener("click", async () => {
+  const val    = parseInt(document.getElementById("adDiscInput").value);
+  const status = document.getElementById("adDiscStatus");
+  if (!val || val < 1 || val > 100) {
+    status.style.color = "#e53935";
+    status.textContent = "1 se 100 ke beech value daalo";
+    return;
+  }
+  const btn = document.getElementById("saveAdDiscBtn");
+  btn.disabled = true; btn.textContent = "Saving...";
+  try {
+    await updateDoc(doc(db, "restaurants", restaurantId), { discount_p_ad: val });
+    status.style.color = "#2e7d32";
+    status.textContent = `Saved — ${val}% ads mein dikhega ✅`;
+  } catch (e) {
+    status.style.color = "#e53935";
+    status.textContent = "Failed: " + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = "Save";
+  }
+});
+
+loadAdDiscount();
