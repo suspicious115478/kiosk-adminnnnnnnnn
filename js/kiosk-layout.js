@@ -1,0 +1,161 @@
+import {
+  db, requireAuth, getRestaurantId, getRestaurantName,
+  handleLogout, showToast
+} from "./firebase.js";
+
+import {
+  doc, getDoc, updateDoc, onSnapshot
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+// ── Auth guard ─────────────────────────────────────────────────────────────────
+await requireAuth();
+document.getElementById("logoutBtn").addEventListener("click", handleLogout);
+
+// ── Restaurant info ────────────────────────────────────────────────────────────
+const restaurantId = await getRestaurantId();
+const name         = await getRestaurantName();
+document.getElementById("restaurantLabel").textContent = name || "My Restaurant";
+
+// ── Logo + brandColor realtime ─────────────────────────────────────────────────
+function showLogoPreview(src) {
+  const preview = document.getElementById("logoPreview");
+  const icon    = document.getElementById("logoIcon");
+  preview.src           = src;
+  preview.style.display = "block";
+  icon.style.display    = "none";
+}
+
+if (restaurantId) {
+  onSnapshot(doc(db, "restaurants", restaurantId), (snap) => {
+    if (!snap.exists()) return;
+    const data = snap.data();
+    if (data.logo) showLogoPreview(data.logo);
+    if (data.brandColor) {
+      const dot = document.getElementById("colorDot");
+      if (dot) dot.style.background = data.brandColor;
+    }
+  });
+}
+
+// ── State ──────────────────────────────────────────────────────────────────────
+let currentSavedLayout = null; // Firebase mein jo save hai
+let selectedLayout     = null; // User ne abhi kya select kiya
+
+// ── DOM refs ───────────────────────────────────────────────────────────────────
+const cardClassic  = document.getElementById("card-classic");
+const cardSingle   = document.getElementById("card-single");
+const radioClassic = document.getElementById("radio-classic");
+const radioSingle  = document.getElementById("radio-single");
+const chipClassic  = document.getElementById("chip-classic");
+const chipSingle   = document.getElementById("chip-single");
+const saveBtn      = document.getElementById("saveLayoutBtn");
+const saveHint     = document.getElementById("saveHint");
+const statusText   = document.getElementById("statusText");
+
+// ── Load current layout from Firebase ─────────────────────────────────────────
+async function loadCurrentLayout() {
+  if (!restaurantId) return;
+  try {
+    const snap = await getDoc(doc(db, "restaurants", restaurantId));
+    if (snap.exists()) {
+      const data = snap.data();
+      currentSavedLayout = data.kioskLayout || null;
+    } else {
+      currentSavedLayout = null;
+    }
+  } catch (e) {
+    currentSavedLayout = null;
+  }
+  renderUI();
+}
+
+// ── Render UI based on state ───────────────────────────────────────────────────
+function renderUI() {
+  // Status bar update
+  if (currentSavedLayout === "classic") {
+    statusText.textContent = "Active layout: Classic Layout";
+  } else if (currentSavedLayout === "single_window") {
+    statusText.textContent = "Active layout: Single Window";
+  } else {
+    statusText.textContent = "Koi layout abhi set nahi hai";
+  }
+
+  // Reset all cards
+  cardClassic.classList.remove("selected", "selected-blue");
+  cardSingle.classList.remove("selected", "selected-blue");
+  radioClassic.classList.remove("checked");
+  radioSingle.classList.remove("checked");
+  chipClassic.style.display = "none";
+  chipSingle.style.display  = "none";
+
+  // Show "Currently Active" chip for saved layout
+  if (currentSavedLayout === "classic") {
+    chipClassic.style.display = "inline-flex";
+  } else if (currentSavedLayout === "single_window") {
+    chipSingle.style.display = "inline-flex";
+  }
+
+  // Show selected state (user's current choice)
+  if (selectedLayout === "classic") {
+    cardClassic.classList.add("selected");
+    radioClassic.classList.add("checked");
+  } else if (selectedLayout === "single_window") {
+    cardSingle.classList.add("selected-blue");
+    radioSingle.classList.add("checked");
+  }
+
+  // Save button state
+  if (selectedLayout && selectedLayout !== currentSavedLayout) {
+    saveBtn.disabled = false;
+    saveHint.textContent = selectedLayout === "classic"
+      ? "Classic Layout select ki gayi hai"
+      : "Single Window select ki gayi hai";
+  } else if (selectedLayout && selectedLayout === currentSavedLayout) {
+    saveBtn.disabled = true;
+    saveHint.textContent = "Yeh layout already active hai";
+  } else {
+    saveBtn.disabled = true;
+    saveHint.textContent = "Pehle ek layout select karein";
+  }
+}
+
+// ── Card click handlers ────────────────────────────────────────────────────────
+cardClassic.addEventListener("click", () => {
+  selectedLayout = "classic";
+  renderUI();
+});
+
+cardSingle.addEventListener("click", () => {
+  selectedLayout = "single_window";
+  renderUI();
+});
+
+// ── Save layout to Firebase ────────────────────────────────────────────────────
+saveBtn.addEventListener("click", async () => {
+  if (!selectedLayout || !restaurantId) return;
+
+  saveBtn.disabled = true;
+  saveBtn.innerHTML = '<span class="spinner"></span> Saving...';
+
+  try {
+    await updateDoc(doc(db, "restaurants", restaurantId), {
+      kioskLayout: selectedLayout
+    });
+
+    currentSavedLayout = selectedLayout;
+    const layoutName = selectedLayout === "classic" ? "Classic Layout" : "Single Window";
+    showToast(`${layoutName} save ho gayi! ✅`);
+    renderUI();
+
+  } catch (err) {
+    showToast("Save nahi hua: " + err.message, true);
+    saveBtn.disabled = false;
+  } finally {
+    saveBtn.innerHTML = `
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      Save Layout`;
+  }
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+await loadCurrentLayout();

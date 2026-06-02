@@ -52,6 +52,7 @@ let selectedItem  = null;
 let searchQuery   = "";
 let activeCat     = "all";
 let categoryUnsubs = [];
+let categoryAvailability = {};  // ← add karo { catId: true/false }
 
 // ── Load all items realtime ───────────────────────────────────────────────────
 function loadAllItems() {
@@ -64,8 +65,10 @@ function loadAllItems() {
       categoryUnsubs = [];
       allItems = [];
 
-      const categories = catSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      buildCatPills(categories);
+     const categories = catSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+categoryAvailability = {};
+categories.forEach(c => { categoryAvailability[c.id] = c.available !== false; });
+buildCatPills(categories);
 
       if (!categories.length) { renderAllItems(); return; }
 
@@ -80,8 +83,9 @@ function loadAllItems() {
             itemSnap.docs.forEach(d => {
               allItems.push({ id: d.id, categoryId: cat.id, categoryName: cat.name, ...d.data() });
             });
-            renderAllItems();
-            renderActiveDiscounts();
+           renderAllItems();
+renderActiveDiscounts();
+autoRemoveUnavailableDiscounts();  // ← add karo
             if (selectedItem) {
               const refreshed = allItems.find(i => i.id === selectedItem.id && i.categoryId === selectedItem.categoryId);
               if (refreshed) {
@@ -104,7 +108,8 @@ function buildCatPills(categories) {
     `<button class="cat-pill ${activeCat === "all" ? "active" : ""}" data-cat="all">All</button>` +
     categories.map(c =>
       `<button class="cat-pill ${activeCat === c.id ? "active" : ""}" data-cat="${c.id}">${c.name}</button>`
-    ).join("");
+    ).join("")
+   
 
   container.querySelectorAll(".cat-pill").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -120,8 +125,9 @@ function buildCatPills(categories) {
 function renderAllItems() {
   const container = document.getElementById("allItemsList");
 
-  let items = allItems;
-  if (activeCat !== "all") items = items.filter(i => i.categoryId === activeCat);
+ let items = allItems;
+if (activeCat !== "all") items = items.filter(i => i.categoryId === activeCat);
+items = items.filter(i => i.available !== false && categoryAvailability[i.categoryId] !== false);
   if (searchQuery.trim()) {
     const q = searchQuery.trim().toLowerCase();
     items = items.filter(i => i.name.toLowerCase().includes(q));
@@ -406,8 +412,8 @@ function renderActiveDiscounts() {
     return;
   }
 
-  container.innerHTML = discountedItems.map(item => `
-    <div class="disc-item-card">
+ container.innerHTML = discountedItems.map(item => `
+    <div class="disc-item-card" style="cursor:pointer;" data-id="${item.id}" data-catid="${item.categoryId}">
       <img class="disc-item-thumb" src="${item.image || ''}" alt="${item.name}" loading="lazy" />
       <div class="disc-item-info">
         <div class="disc-item-name">${item.name}</div>
@@ -418,7 +424,20 @@ function renderActiveDiscounts() {
         </div>
       </div>
     </div>
-  `).join("");
+ `).join("");
+
+  container.querySelectorAll(".disc-item-card").forEach(el => {
+    el.addEventListener("click", () => {
+      const id    = el.dataset.id;
+      const catId = el.dataset.catid;
+      const item  = allItems.find(i => i.id === id && i.categoryId === catId);
+      if (!item) return;
+      selectedItem = item;
+      renderAllItems();
+      updateRightPanel();
+      document.querySelector(".discount-form-card")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  });
 }
 
 // ── Search ────────────────────────────────────────────────────────────────────
@@ -437,6 +456,26 @@ clearSearch.addEventListener("click", () => {
   searchInput.focus();
   renderAllItems();
 });
+
+async function autoRemoveUnavailableDiscounts() {
+  if (!restaurantId) return;
+ const toRemove = allItems.filter(i =>
+  (i.available === false || categoryAvailability[i.categoryId] === false) &&
+  i.discountedPrice != null &&
+  i.discountedPrice < i.price
+);
+  for (const item of toRemove) {
+    try {
+      await updateDoc(
+        doc(db, "restaurants", restaurantId, "categories", item.categoryId, "menu_items", item.id),
+        { discountedPrice: null, discountPercent: null, discountAppliedAt: null }
+      );
+      await syncDiscountedItemIds("remove", { itemId: item.id, categoryId: item.categoryId });
+    } catch (e) {
+      console.warn("Auto-remove discount failed:", item.name, e.message);
+    }
+  }
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadAllItems();

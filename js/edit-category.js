@@ -27,6 +27,18 @@ document.getElementById("breadcrumbName").textContent  = catName;
 
 bindPreview("editImage", "editPreview");
 
+async function transliterateText(text) {
+  try {
+    const encoded = encodeURIComponent(text);
+    const res  = await fetch(`https://inputtools.google.com/request?text=${encoded}&itc=hi-t-i0-und&num=1&cp=0&cs=1&ie=utf-8&oe=utf-8`, { headers: { Referer: "https://www.google.com/" } });
+    const json = await res.json();
+    if (json[0] === "SUCCESS") return json[1][0][1][0];
+    return null;
+  } catch { return null; }
+}
+let _nameHindiTimer = null;
+let _descHindiTimer = null;
+
 // ── Logo / brand color sync ────────────────────────────────────────────────────
 function showLogoPreview(src) {
   const preview = document.getElementById("logoPreview");
@@ -174,21 +186,56 @@ window.openEdit = (id) => {
   const item = (window._itemsCache || []).find(i => i.id === id);
   if (!item) return;
   _editId = id;
-  document.getElementById("editName").value  = item.name;
-  document.getElementById("editPrice").value = item.price;
-  document.getElementById("editDesc").value  = item.description || "";
+
+  document.getElementById("editName").value       = item.name;
+  document.getElementById("editPrice").value      = item.price;
+  document.getElementById("editDesc").value       = item.description || "";
   document.getElementById("editDescCounter").textContent = `${(item.description || "").length} / 150`;
-  document.getElementById("editImage").value = "";
+  document.getElementById("editNameHindi").value  = item.item_name_l2 || "";
+  document.getElementById("editDescHindi").value  = item.description_l2 || "";
+  document.getElementById("editNameHindiStatus").textContent = "";
+  document.getElementById("editDescHindiStatus").textContent = "(optional)";
+  document.getElementById("editImage").value      = "";
   document.getElementById("editPreview").style.display = "none";
   document.getElementById("editModal").classList.add("open");
+
+  // Name transliteration
+  document.getElementById("editName").oninput = () => {
+    clearTimeout(_nameHindiTimer);
+    const val = document.getElementById("editName").value.trim();
+    if (!val) { document.getElementById("editNameHindiStatus").textContent = ""; return; }
+    document.getElementById("editNameHindiStatus").textContent = "translating...";
+    _nameHindiTimer = setTimeout(async () => {
+      const result = await transliterateText(val);
+      if (result) { document.getElementById("editNameHindi").value = result; document.getElementById("editNameHindiStatus").textContent = "✓ auto"; }
+      else document.getElementById("editNameHindiStatus").textContent = "";
+    }, 500);
+  };
+
+  // Description transliteration
+  document.getElementById("editDesc").oninput = () => {
+    clearTimeout(_descHindiTimer);
+    const val = document.getElementById("editDesc").value.trim();
+    const len = document.getElementById("editDesc").value.length;
+    const counter = document.getElementById("editDescCounter");
+    counter.textContent = `${len} / 150`;
+    counter.style.color = len >= 140 ? "var(--red)" : "var(--muted)";
+    if (!val) { document.getElementById("editDescHindiStatus").textContent = "(optional)"; return; }
+    document.getElementById("editDescHindiStatus").textContent = "translating...";
+    _descHindiTimer = setTimeout(async () => {
+      const result = await transliterateText(val);
+      if (result) { document.getElementById("editDescHindi").value = result; document.getElementById("editDescHindiStatus").textContent = "✓ auto"; }
+      else document.getElementById("editDescHindiStatus").textContent = "(optional)";
+    }, 500);
+  };
 };
 
-document.getElementById("editDesc").addEventListener("input", () => {
-  const len = document.getElementById("editDesc").value.length;
-  const counter = document.getElementById("editDescCounter");
-  counter.textContent = `${len} / 150`;
-  counter.style.color = len >= 140 ? "var(--red)" : "var(--muted)";
-});
+// document.getElementById("editDesc").addEventListener("input", () => {
+//   const len = document.getElementById("editDesc").value.length;
+//   const counter = document.getElementById("editDescCounter");
+//   counter.textContent = `${len} / 150`;
+//   counter.style.color = len >= 140 ? "var(--red)" : "var(--muted)";
+// });
 
 
 
@@ -215,8 +262,10 @@ document.getElementById("editSaveBtn").addEventListener("click", async () => {
   btn.innerHTML = '<span class="spinner"></span> Saving...';
 
   try {
-   const newDesc = document.getElementById("editDesc").value.trim();
-const updateData = { name: newName, price: Number(newPrice), description: newDesc };
+  const newDesc      = document.getElementById("editDesc").value.trim();
+    const newHindiName = document.getElementById("editNameHindi").value.trim();
+    const newDescHindi = document.getElementById("editDescHindi").value.trim();
+    const updateData   = { name: newName, price: Number(newPrice), description: newDesc, item_name_l2: newHindiName || null, description_l2: newDescHindi || null };
     if (file) updateData.image = await compressImage(file, 400);
     await updateDoc(
       doc(db, "restaurants", restaurantId, "categories", categoryId, "menu_items", _editId),

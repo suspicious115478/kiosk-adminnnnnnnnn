@@ -33,6 +33,66 @@
       margin-top: 8px;
     }
 
+
+
+
+
+
+    .tag-input-box {
+  min-height: 80px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface2);
+  display: flex; flex-wrap: wrap; gap: 8px;
+  align-items: flex-start;
+  cursor: text;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.tag-input-box:focus-within {
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px rgba(200,131,26,0.1);
+}
+.tag-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px 4px 12px;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-brd);
+  border-radius: 99px;
+  font-size: 0.78rem; font-weight: 500;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.tag-chip-remove {
+  display: flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--accent-brd);
+  border: none; cursor: pointer;
+  color: var(--accent);
+  font-size: 10px; font-weight: 700;
+  line-height: 1;
+  padding: 0;
+  transition: background 0.15s;
+}
+.tag-chip-remove:hover { background: var(--accent); color: #fff; }
+.tag-text-input {
+  border: none; outline: none;
+  background: transparent;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  color: var(--text);
+  flex: 1; min-width: 140px;
+  padding: 4px 2px;
+}
+.tag-text-input::placeholder { color: var(--muted); }
+.tag-hint {
+  font-size: 0.7rem; color: var(--muted);
+  margin: 6px 0 0;
+}
+.tag-hint.at-limit { color: var(--red); }
+
     /* ── EDITOR GRID ── */
     .editor-grid {
       display: grid;
@@ -554,15 +614,14 @@
             </div>
           </div>
 
-          <div class="ribbon-label-row">
-            <label class="field-label">Items (comma separated)</label>
-            <span class="item-count-badge" id="wordCount">0 / 12 items</span>
-          </div>
-          <textarea
-            id="ribbonInput"
-            class="custom-textarea"
-            placeholder="e.g. Burger, Pizza, Cold Coffee, Pasta, Coke..."
-          ></textarea>
+        <div class="ribbon-label-row">
+  <label class="field-label">Items</label>
+  <span class="item-count-badge" id="wordCount">0 / 12</span>
+</div>
+<div class="tag-input-box" id="tagBox">
+  <input id="ribbonInput" class="tag-text-input" placeholder="Type item name, press Enter" maxlength="40" />
+</div>
+<p class="tag-hint" id="tagHint">Press Enter or comma to add · Max 12 items</p>
 
           <!-- Live ribbon preview -->
           <div class="ribbon-preview-wrap" id="ribbonPreviewWrap">

@@ -38,9 +38,9 @@ if (restaurantId) {
 
       // Ribbon text
       if (data.item_names) {
-        ribbonInput.value = data.item_names;
-        updateRibbonPreview();
-      }
+  ribbonTags = data.item_names.split(",").map(i => i.trim()).filter(Boolean).slice(0, MAX_TAGS);
+  renderTags();
+}
     }
   } catch (err) {
     showToast("Data load failed: " + err.message, true);
@@ -86,20 +86,70 @@ heroDropZone.addEventListener("drop", (e) => {
 });
 
 // ── 3. Ribbon preview + word count ────────────────────────────
-ribbonInput.addEventListener("input", updateRibbonPreview);
+// ── State ──────────────────────────────────────────────────────
+let ribbonTags = [];
+const MAX_TAGS = 12;
 
+const tagBox       = document.getElementById("tagBox");
+const tagInput     = document.getElementById("ribbonInput");
+const wordCount    = document.getElementById("wordCount");
+const tagHint      = document.getElementById("tagHint");
+
+// ── Tags render ────────────────────────────────────────────────
+function renderTags() {
+  tagBox.querySelectorAll(".tag-chip").forEach(el => el.remove());
+  ribbonTags.forEach((tag, i) => {
+    const chip = document.createElement("span");
+    chip.className = "tag-chip";
+    chip.innerHTML = `${tag}<button class="tag-chip-remove" data-i="${i}" title="Remove">✕</button>`;
+    tagBox.insertBefore(chip, tagInput);
+  });
+  wordCount.textContent = `${ribbonTags.length} / ${MAX_TAGS}`;
+  wordCount.classList.toggle("over", ribbonTags.length >= MAX_TAGS);
+  tagHint.classList.toggle("at-limit", ribbonTags.length >= MAX_TAGS);
+  tagInput.style.display = ribbonTags.length >= MAX_TAGS ? "none" : "";
+  updateRibbonPreview();
+}
+
+function addTag(val) {
+  const trimmed = val.trim();
+  if (!trimmed || ribbonTags.length >= MAX_TAGS) return;
+  ribbonTags.push(trimmed);
+  tagInput.value = "";
+  renderTags();
+}
+
+tagBox.addEventListener("click", () => tagInput.focus());
+
+tagInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === ",") {
+    e.preventDefault();
+    addTag(tagInput.value.replace(/,$/, ""));
+  }
+  if (e.key === "Backspace" && tagInput.value === "" && ribbonTags.length) {
+    ribbonTags.pop();
+    renderTags();
+  }
+});
+
+tagInput.addEventListener("blur", () => {
+  if (tagInput.value.trim()) addTag(tagInput.value);
+});
+
+tagBox.addEventListener("click", (e) => {
+  const btn = e.target.closest(".tag-chip-remove");
+  if (!btn) return;
+  ribbonTags.splice(Number(btn.dataset.i), 1);
+  renderTags();
+});
+
+// ── Ribbon preview ─────────────────────────────────────────────
 function updateRibbonPreview() {
-  const items = ribbonInput.value.split(",").map(i => i.trim()).filter(Boolean);
-  const count = items.length;
-
-  wordCountDisplay.textContent = `${count} / 12 items`;
-  wordCountDisplay.classList.toggle("over", count > 12);
-
-  if (!items.length) {
+  if (!ribbonTags.length) {
     ribbonItemsEl.innerHTML = `<span class="ribbon-item"><span class="ribbon-sep">✦</span> Add items above to see preview</span>`;
     return;
   }
-  const doubled = [...items, ...items];
+  const doubled = [...ribbonTags, ...ribbonTags];
   ribbonItemsEl.innerHTML = doubled
     .map(i => `<span class="ribbon-item"><span class="ribbon-sep">✦</span> ${i}</span>`)
     .join("");
@@ -112,11 +162,7 @@ saveBtn.addEventListener("click", async () => {
     showToast("Pehle hero image upload karo", true);
     return;
   }
-  const items = ribbonInput.value.split(",").filter(i => i.trim() !== "");
-  if (items.length > 12) {
-    showToast("Max 12 items allowed", true);
-    return;
-  }
+ if (!ribbonTags.length) { showToast("Kam se kam ek ribbon item add karo", true); return; }
   if (!restaurantId) {
     showToast("Restaurant ID nahi mila, logout karke login karo", true);
     return;
@@ -128,7 +174,7 @@ saveBtn.addEventListener("click", async () => {
   try {
     await updateDoc(doc(db, "restaurants", restaurantId), {
       item1: currentHeroBase64,
-      item_names: ribbonInput.value.trim(),
+     item_names: ribbonTags.join(", "),
       sync: true
     });
     showToast("Front Screen save ho gaya! ✅");

@@ -74,6 +74,15 @@ function rowHTML(uid) {
         <input type="text" class="row-name" placeholder="e.g. Paneer Tikka, Veg Burger" />
       </div>
 
+      <div class="field row-hindi-field" id="hindiFld_${uid}" style="display:none;">
+        <label style="display:flex;align-items:center;gap:8px;">
+          Hindi Name
+          <span class="row-hindi-status" id="hindiStatus_${uid}" style="font-size:11px;color:#aaa;font-weight:400;"></span>
+        </label>
+        <input type="text" class="row-name-hindi" id="hindiInput_${uid}" placeholder="हिंदी नाम" style="font-family:inherit;" />
+        <div style="font-size:11px;color:#aaa;margin-top:4px;">Auto-transliterated · आप इसे edit कर सकते हैं</div>
+      </div>
+
       <div class="field">
         <label>Price (₹)</label>
         <div class="price-wrap">
@@ -94,6 +103,15 @@ function rowHTML(uid) {
           placeholder="Short description of the dish (optional)..."
           rows="2"
         ></textarea>
+      </div>
+
+      <div class="field row-hindi-field" id="descHindiFld_${uid}" style="display:none;">
+        <label style="display:flex;align-items:center;gap:8px;">
+          Hindi Description
+          <span class="row-hindi-status" id="descHindiStatus_${uid}" style="font-size:11px;color:#aaa;font-weight:400;"></span>
+        </label>
+        <textarea class="row-desc-hindi" id="descHindiInput_${uid}" placeholder="हिंदी विवरण" rows="2" style="font-family:inherit;"></textarea>
+        <div style="font-size:11px;color:#aaa;margin-top:4px;">Auto-transliterated · आप इसे edit कर सकते हैं</div>
       </div>
 
       <div class="field">
@@ -117,6 +135,17 @@ function rowHTML(uid) {
   `;
 }
 
+async function transliterateText(text) {
+    try {
+        const encoded = encodeURIComponent(text);
+        const url = `https://inputtools.google.com/request?text=${encoded}&itc=hi-t-i0-und&num=1&cp=0&cs=1&ie=utf-8&oe=utf-8`;
+        const res = await fetch(url, { headers: { "Referer": "https://www.google.com/" } });
+        const json = await res.json();
+        if (json[0] !== "SUCCESS") return null;
+        return json[1][0][1][0];
+    } catch (e) { return null; }
+}
+
 // ── Bind events for a single row ──────────────────────────────────────────────
 function bindRowEvents(uid) {
   const row        = document.getElementById(`row_${uid}`);
@@ -125,9 +154,60 @@ function bindRowEvents(uid) {
   // Char counter for description
   const textarea   = document.getElementById(`desc_${uid}`);
   const counter    = document.getElementById(`counter_${uid}`);
+ const descHindiFld    = document.getElementById(`descHindiFld_${uid}`);
+  const descHindiStatus = document.getElementById(`descHindiStatus_${uid}`);
+  const descHindiInput  = document.getElementById(`descHindiInput_${uid}`);
+  let   descHindiTimer  = null;
+
   textarea.addEventListener("input", () => {
     counter.textContent = `${textarea.value.length}/150`;
+    const val = textarea.value.trim();
+    clearTimeout(descHindiTimer);
+    if (!val) {
+      descHindiFld.style.display = "none";
+      descHindiInput.value = "";
+      return;
+    }
+    descHindiStatus.textContent = "translating...";
+    descHindiFld.style.display = "block";
+    descHindiTimer = setTimeout(async () => {
+      const result = await transliterateText(val);
+      if (result) {
+        descHindiInput.value = result;
+        descHindiStatus.textContent = "✓ auto";
+      } else {
+        descHindiStatus.textContent = "failed";
+      }
+    }, 500);
   });
+
+  // yeh block add karo — existing fileInput listener se pehle
+const nameInput    = row.querySelector(".row-name");
+const hindiFld     = document.getElementById(`hindiFld_${uid}`);
+const hindiStatus  = document.getElementById(`hindiStatus_${uid}`);
+const hindiInput   = document.getElementById(`hindiInput_${uid}`);
+let   hindiTimer   = null;
+
+nameInput.addEventListener("input", () => {
+    const val = nameInput.value.trim();
+    clearTimeout(hindiTimer);
+    if (!val) {
+        hindiFld.style.display = "none";
+        hindiInput.value = "";
+        return;
+    }
+    hindiStatus.textContent = "translating...";
+    hindiFld.style.display = "block";
+    hindiTimer = setTimeout(async () => {
+        const result = await transliterateText(val);
+        if (result) {
+            hindiInput.value = result;
+            hindiStatus.textContent = "✓ auto";
+        } else {
+            hindiStatus.textContent = "failed";
+        }
+    }, 500);
+});
 
   // File input & preview
   const fileInput  = document.getElementById(`rowImg_${uid}`);
@@ -373,7 +453,9 @@ document.getElementById("uploadItemBtn").addEventListener("click", async () => {
     if (!price || Number(price) <= 0) return showToast(`${rowNum}: please enter a valid price`, true);
     if (!file)                        return showToast(`${rowNum}: please select an image`, true);
 
-    items.push({ name, price: Number(price), desc, file });
+const hindiVal  = row.querySelector(".row-name-hindi")?.value.trim() || null;
+    const hindiDesc = row.querySelector(".row-desc-hindi")?.value.trim() || null;
+    items.push({ name, price: Number(price), desc, file, hindiName: hindiVal, hindiDesc });
   }
 
   // ── Upload ──
@@ -387,19 +469,21 @@ document.getElementById("uploadItemBtn").addEventListener("click", async () => {
 
     for (const item of items) {
       const image = await compressImage(item.file, 400);
-      await addDoc(
-        collection(db, "restaurants", restaurantId, "categories", categoryId, "menu_items"),
-        {
-          name:         item.name,
-          price:        item.price,
-          description:  item.desc,
-          image,
-          categoryId,
-          categoryName,
-          available:    true,
-          createdAt:    Date.now()
-        }
-      );
+     await addDoc(
+    collection(db, "restaurants", restaurantId, "categories", categoryId, "menu_items"),
+    {
+        name:          item.name,
+        item_name_l2:  item.hindiName || null,
+        price:         item.price,
+        description:   item.desc,
+        description_l2: item.hindiDesc || null,
+        image,
+        categoryId,
+        categoryName,
+        available:     true,
+        createdAt:     Date.now()
+    }
+);
       uploaded++;
     }
 

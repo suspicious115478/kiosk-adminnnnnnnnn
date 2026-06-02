@@ -139,6 +139,75 @@ function renderCategories(categories) {
   `).join("");
 }
 
+// ── Transliteration preview ────────────────────────────────────────────────
+let transTimer = null;
+
+function buildTranslitField() {
+  const field = document.createElement("div");
+  field.className = "field";
+  field.id = "translitField";
+  field.style.display = "none";
+  field.innerHTML = `
+    <label style="display:flex;align-items:center;gap:8px;">
+      Hindi Name
+      <span id="transStatus" style="font-size:11px;color:#aaa;font-weight:400;"></span>
+    </label>
+    <input type="text" id="catNameHindi" placeholder="हिंदी नाम" 
+           style="font-family:inherit;font-size:15px;" />
+    <div style="font-size:11px;color:#aaa;margin-top:4px;">
+      Auto-transliterated · आप इसे edit कर सकते हैं
+    </div>
+  `;
+  // catName field ke baad insert karo
+  const catNameField = document.getElementById("catName").closest(".field");
+  catNameField.insertAdjacentElement("afterend", field);
+}
+
+buildTranslitField();
+
+async function transliterateText(text) {
+  try {
+    const encoded = encodeURIComponent(text);
+    const url = `https://inputtools.google.com/request?text=${encoded}&itc=hi-t-i0-und&num=1&cp=0&cs=1&ie=utf-8&oe=utf-8`;
+    const res = await fetch(url, {
+      headers: { "Referer": "https://www.google.com/" }
+    });
+    const json = await res.json();
+    if (json[0] !== "SUCCESS") return null;
+    return json[1][0][1][0]; // first suggestion
+  } catch (e) {
+    return null;
+  }
+}
+
+document.getElementById("catName").addEventListener("input", (e) => {
+  const val = e.target.value.trim();
+  const field = document.getElementById("translitField");
+  const status = document.getElementById("transStatus");
+  const hindiInput = document.getElementById("catNameHindi");
+
+  clearTimeout(transTimer);
+
+  if (!val) {
+    field.style.display = "none";
+    hindiInput.value = "";
+    return;
+  }
+
+  status.textContent = "translating...";
+  field.style.display = "block";
+
+  transTimer = setTimeout(async () => {
+    const result = await transliterateText(val);
+    if (result) {
+      hindiInput.value = result;
+      status.textContent = "✓ auto";
+    } else {
+      status.textContent = "failed";
+    }
+  }, 500);
+});
+
 // ── Save category ──────────────────────────────────────────────────────────────
 document.getElementById("saveCatBtn").addEventListener("click", async () => {
   const catName = document.getElementById("catName").value.trim();
@@ -155,12 +224,14 @@ document.getElementById("saveCatBtn").addEventListener("click", async () => {
     const image = await compressImage(file, 600);
     if (!restaurantId) return showToast("Restaurant not found", true);
 
-    await addDoc(collection(db, "restaurants", restaurantId, "categories"), {
-      name: catName,
-      image,
-      available: true, 
-      createdAt: Date.now()
-    });
+   const hindiName = document.getElementById("catNameHindi").value.trim();
+await addDoc(collection(db, "restaurants", restaurantId, "categories"), {
+  name: catName,
+  category_name_l2: hindiName || null,
+  image,
+  available: true,
+  createdAt: Date.now()
+});
 
     showToast(`"${catName}" saved! ✅`, false);
 
@@ -170,6 +241,8 @@ document.getElementById("saveCatBtn").addEventListener("click", async () => {
     catPreviewImg.src         = "";
     previewWrap.style.display = "none";
     fileDrop.style.display    = "flex";
+    document.getElementById("catNameHindi").value = "";
+document.getElementById("translitField").style.display = "none";
 
   } catch (e) {
     showToast(e.message || "Something went wrong", true);

@@ -54,6 +54,7 @@ async function loadCategories() {
   );
 
   const cats = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  window._catsCache = cats;
   const list = document.getElementById("categoryList");
   const chip = document.getElementById("catCountChip");
   if (chip) chip.textContent = cats.length;
@@ -163,13 +164,41 @@ document.getElementById("deleteConfirmBtn").addEventListener("click", async () =
 // ── Edit ──────────────────────────────────────────────────────────────────────
 let _editId = null;
 
+let _catHindiTimer = null;
+
 window.openEdit = (id, currentName, e) => {
   e.stopPropagation();
   _editId = id;
-  document.getElementById("editName").value = currentName;
-  document.getElementById("editImage").value = "";
+
+  // Current data cache se lo
+  const snap = window._catsCache?.find(c => c.id === id);
+
+  document.getElementById("editName").value        = currentName;
+  document.getElementById("editCatNameHindi").value = snap?.category_name_l2 || "";
+  document.getElementById("editCatHindiStatus").textContent = "";
+  document.getElementById("editImage").value        = "";
   document.getElementById("editPreview").style.display = "none";
   document.getElementById("editModal").classList.add("open");
+
+  // Transliteration on name input
+  const nameEl   = document.getElementById("editName");
+  const hindiEl  = document.getElementById("editCatNameHindi");
+  const statusEl = document.getElementById("editCatHindiStatus");
+
+  nameEl.oninput = () => {
+    clearTimeout(_catHindiTimer);
+    if (!nameEl.value.trim()) { statusEl.textContent = ""; return; }
+    statusEl.textContent = "translating...";
+    _catHindiTimer = setTimeout(async () => {
+      try {
+        const encoded = encodeURIComponent(nameEl.value.trim());
+        const res  = await fetch(`https://inputtools.google.com/request?text=${encoded}&itc=hi-t-i0-und&num=1&cp=0&cs=1&ie=utf-8&oe=utf-8`, { headers: { Referer: "https://www.google.com/" } });
+        const json = await res.json();
+        if (json[0] === "SUCCESS") { hindiEl.value = json[1][0][1][0]; statusEl.textContent = "✓ auto"; }
+        else statusEl.textContent = "";
+      } catch { statusEl.textContent = ""; }
+    }, 500);
+  };
 };
 
 document.getElementById("editModalClose").addEventListener("click", () => {
@@ -192,7 +221,8 @@ document.getElementById("editSaveBtn").addEventListener("click", async () => {
   btn.innerHTML = '<span class="spinner"></span> Saving...';
 
   try {
-    const updateData = { name: newName };
+    const hindiName  = document.getElementById("editCatNameHindi").value.trim();
+    const updateData = { name: newName, category_name_l2: hindiName || null };
     if (file) updateData.image = await compressImage(file, 600);
     await updateDoc(doc(db, "restaurants", restaurantId, "categories", _editId), updateData);
     showToast(`"${newName}" updated ✅`);

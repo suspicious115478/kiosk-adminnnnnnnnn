@@ -201,6 +201,7 @@ function buildOrderCard(order, isNew, index) {
   const total     = order.totalPrice || 0;
   const shortId   = (order.orderId || order.id || "").slice(0, 6).toUpperCase();
   const timeStr   = formatTime(order.createdAt);
+  const payStatus = order.paymentStatus || null;
 
   const typeLabel     = { DINE_IN: "Dine In", TAKEAWAY: "Takeaway", KIOSK: "Kiosk" }[orderType] || orderType;
   const statusOptions = ["NEW", "PREPARING", "COMPLETED"];
@@ -248,6 +249,7 @@ function buildOrderCard(order, isNew, index) {
           ${statusDot(status)} ${statusLabel(status)}
         </span>
         ${completionBadgeHtml}
+       ${payStatus ? `<span class="payment-badge ps-${payStatus.toLowerCase()}">${{"PENDING":"🟡 Pending","SUCCESS":"🟢 Paid","FAILED":"🔴 Failed","CANCELLED":"⚫ Cancelled"}[payStatus]||payStatus}</span>` : ""}
         <select class="status-select" data-order-id="${order.id}" data-old-status="${status}">
           ${statusOptsHtml}
         </select>

@@ -56,9 +56,9 @@ let activeCat       = "all";
 async function loadExistingFeatured() {
   if (!restaurantId) return;
   try {
-    const snap = await getDoc(doc(db, "restaurants", restaurantId));
+    const snap = await getDoc(doc(db, "restaurants", restaurantId, "featured", "items"));
     if (snap.exists() && snap.data().featuredItems) {
-      const existing = snap.data().featuredItems; // array of item IDs
+      const existing = snap.data().featuredItems;
       existing.forEach(id => selectedIds.add(id));
     }
   } catch (e) {
@@ -286,12 +286,11 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
       };
     });
 
-    await updateDoc(doc(db, "restaurants", restaurantId), {
-      featuredItems:     featuredItems,      // array of IDs (for quick lookup)
-      featuredItemsData: featuredData,       // full snapshot (for customer display)
+    await setDoc(doc(db, "restaurants", restaurantId, "featured", "items"), {
+      featuredItems:     featuredItems,
+      featuredItemsData: featuredData,
       featuredUpdatedAt: Date.now()
     });
-
    showToast(`${featuredItems.length} featured items saved successfully! ⭐`);
   } catch (e) {
     showToast("Save failed: " + e.message, true);
