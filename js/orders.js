@@ -160,23 +160,20 @@ function renderOrders(orders, flashIds = []) {
   list.querySelector(".orders-empty")?.remove();
 
   // Orders render karo — existing update, naye add karo
-  orders.forEach((order, i) => {
+ orders.forEach((order, i) => {
     const isNew   = flashIds.includes(order.id);
     const newHtml = buildOrderCard(order, isNew, i);
 
     if (existingCards.has(order.id)) {
-      // Existing card — sirf content update karo, flicker nahi
       const temp = document.createElement("div");
       temp.innerHTML = newHtml;
       const newCard = temp.firstElementChild;
       const oldCard = existingCards.get(order.id);
 
-      // Sirf status change hua ho toh class update karo
       if (oldCard.className !== newCard.className) {
         oldCard.className = newCard.className;
       }
 
-      // Header aur footer quietly update karo
       const oldHeader = oldCard.querySelector(".order-header");
       const newHeader = newCard.querySelector(".order-header");
       if (oldHeader && newHeader && oldHeader.innerHTML !== newHeader.innerHTML) {
@@ -190,23 +187,17 @@ function renderOrders(orders, flashIds = []) {
         oldFooter.innerHTML = newFooter.innerHTML;
       }
 
+      // ✅ Card ko correct position pe move karo
+      list.appendChild(oldCard);
+
     } else {
-      // Naya card — fade in ke saath add karo
       const temp = document.createElement("div");
       temp.innerHTML = newHtml;
       const card = temp.firstElementChild;
       card.style.opacity = "0";
       card.style.transform = "translateY(12px)";
+      list.appendChild(card);
 
-      // Pehle existing cards se pehle insert karo (newest first)
-      const firstCard = list.querySelector(".order-card");
-      if (firstCard) {
-        list.insertBefore(card, firstCard);
-      } else {
-        list.appendChild(card);
-      }
-
-      // Smooth fade in
       requestAnimationFrame(() => {
         card.style.transition = "opacity 0.35s ease, transform 0.35s ease";
         card.style.opacity = "1";
