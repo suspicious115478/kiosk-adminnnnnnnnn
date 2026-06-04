@@ -111,7 +111,7 @@ function rowHTML(uid) {
           <span class="row-hindi-status" id="descHindiStatus_${uid}" style="font-size:11px;color:#aaa;font-weight:400;"></span>
         </label>
         <textarea class="row-desc-hindi" id="descHindiInput_${uid}" placeholder="हिंदी विवरण" rows="2" style="font-family:inherit;"></textarea>
-        <div style="font-size:11px;color:#aaa;margin-top:4px;">Auto-transliterated · आप इसे edit कर सकते हैं</div>
+        <div style="font-size:11px;color:#aaa;margin-top:4px;">Auto-transliterated · आप इसे एडिट कर सकते हैं</div>
       </div>
 
       <div class="field">

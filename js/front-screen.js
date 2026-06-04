@@ -161,7 +161,7 @@ saveBtn.addEventListener("click", async () => {
     showToast("Please upload a hero image first", true);
     return;
   }
- if (!ribbonTags.length) { showToast("Kam se kam ek ribbon item add karo", true); return; }
+ if (!ribbonTags.length) { showToast("Please add at least one ribbon item", true); return; }
   if (!restaurantId) {
     showToast("Restaurant ID not found, please log out and sign in again", true);
     return;

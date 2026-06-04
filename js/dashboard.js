@@ -34,14 +34,14 @@ function showLogoPreview(src) {
 document.getElementById("logoInput").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file || !restaurantId) return;
-  showToast("Logo upload ho raha hai...");
+  showToast("Uploading logo...");
   try {
     const base64 = await compressImage(file, 300);
     await updateDoc(doc(db, "restaurants", restaurantId), { logo: base64 });
     showLogoPreview(base64);
-    showToast("Logo save ho gaya! ✅");
+   showToast("Logo saved! ✅");
   } catch (err) {
-    showToast("Logo save nahi hua: " + err.message, true);
+   showToast("Failed to save logo: " + err.message, true);
   }
 });
 
