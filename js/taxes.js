@@ -14,10 +14,6 @@ const restaurantId = await getRestaurantId();
 const name         = await getRestaurantName();
 
 document.getElementById("restaurantLabel").textContent = name || "My Restaurant";
-if (restaurantId) {
-  document.getElementById("statRestId").textContent =
-    restaurantId.slice(0, 6).toUpperCase();
-}
 
 // ── Logo + brand color (sidebar) ─────────────────────────────────────────────
 if (restaurantId) {

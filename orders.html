@@ -121,11 +121,35 @@
 
     <div class="content">
 
-      <div class="page-heading fade-up">
-        <div class="page-eyebrow"><span class="eyebrow-dot"></span>Operations</div>
-        <h1 class="page-title">Orders</h1>
-        <p class="page-sub">View live orders and update their status in real time</p>
-      </div>
+     <div class="page-heading-row fade-up">
+  <div>
+    <div class="page-eyebrow"><span class="eyebrow-dot"></span>Operations</div>
+    <h1 class="page-title">Orders</h1>
+    <p class="page-sub">View live orders and update their status in real time</p>
+  </div>
+  <div class="heading-summary-row">
+    <div class="hs-chip">
+      <span class="hs-val" id="sumTotal">—</span>
+      <span class="hs-lbl">Total</span>
+    </div>
+    <div class="hs-chip hs-accent">
+      <span class="hs-val" id="sumRevenue">—</span>
+      <span class="hs-lbl">Revenue</span>
+    </div>
+    <div class="hs-chip hs-orange">
+      <span class="hs-val" id="sumNew">—</span>
+      <span class="hs-lbl">New</span>
+    </div>
+    <div class="hs-chip hs-blue">
+      <span class="hs-val" id="sumPrep">—</span>
+      <span class="hs-lbl">Preparing</span>
+    </div>
+    <div class="hs-chip hs-green">
+      <span class="hs-val" id="sumDone">—</span>
+      <span class="hs-lbl">Done</span>
+    </div>
+  </div>
+</div>
 
       <!-- Tabs -->
       <div class="tab-row fade-up" style="animation-delay:0.06s">
@@ -140,9 +164,9 @@
       </div>
 
       <!-- Live badge -->
-      <div id="liveBadgeRow" class="live-badge-row fade-up" style="animation-delay:0.1s">
+      <!-- <div id="liveBadgeRow" class="live-badge-row fade-up" style="animation-delay:0.1s">
         <span class="live-badge"><span class="pulse-dot"></span> Listening for new orders...</span>
-      </div>
+      </div> -->
 
       <!-- Date picker -->
       <div id="datePickerRow" class="date-row fade-up" style="display:none; animation-delay:0.1s">
@@ -150,7 +174,7 @@
         <button id="loadDateBtn" class="load-btn">Load Orders</button>
       </div>
 
-      <!-- Summary -->
+      <!-- Summary
       <div class="summary-bar fade-up" id="summaryBar" style="animation-delay:0.12s">
         <div class="summary-chip">
           <span class="summary-chip-val" id="sumTotal">—</span>
@@ -165,10 +189,14 @@
           <span class="summary-chip-label">New</span>
         </div>
         <div class="summary-chip">
+  <span class="summary-chip-val" id="sumPrep">—</span>
+  <span class="summary-chip-label">Preparing</span>
+</div>
+        <div class="summary-chip">
           <span class="summary-chip-val" id="sumDone">—</span>
           <span class="summary-chip-label">Done</span>
         </div>
-      </div>
+      </div> -->
 
       <!-- Orders list -->
       <div id="ordersList" class="fade-up" style="animation-delay:0.16s">

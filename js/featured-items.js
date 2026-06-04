@@ -53,13 +53,20 @@ let searchQuery     = "";
 let activeCat       = "all";
 
 // ── Load existing featured items from Firestore ───────────────────────────────
+let preloadedFeaturedData = []; // saved snapshot data
+
 async function loadExistingFeatured() {
   if (!restaurantId) return;
   try {
     const snap = await getDoc(doc(db, "restaurants", restaurantId, "featured", "items"));
-    if (snap.exists() && snap.data().featuredItems) {
-      const existing = snap.data().featuredItems;
-      existing.forEach(id => selectedIds.add(id));
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data.featuredItems) {
+        data.featuredItems.forEach(id => selectedIds.add(id));
+      }
+      if (data.featuredItemsData) {
+        preloadedFeaturedData = data.featuredItemsData;
+      }
     }
   } catch (e) {
     console.warn("Could not load featured items:", e);
@@ -222,9 +229,12 @@ function renderFeaturedList() {
     return;
   }
 
-  const selectedItems = [...selectedIds]
-    .map(id => allItems.find(i => i.id === id))
-    .filter(Boolean);
+  // allItems se milao, nahi mila toh preloaded snapshot use karo
+  const selectedItems = [...selectedIds].map(id => {
+    return allItems.find(i => i.id === id)
+      || preloadedFeaturedData.find(i => i.id === id)
+      || null;
+  }).filter(Boolean);
 
   container.innerHTML = selectedItems.map((item, idx) => `
     <div class="featured-item-card" data-id="${item.id}">
@@ -240,7 +250,6 @@ function renderFeaturedList() {
     </div>
   `).join("");
 
-  // Remove button events
   container.querySelectorAll(".feat-remove").forEach(btn => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -323,6 +332,7 @@ clearSearch.addEventListener("click", () => {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 await loadExistingFeatured();
-loadAllItems();
 updateCounter();
 updateSaveBtn();
+renderFeaturedList();
+loadAllItems();

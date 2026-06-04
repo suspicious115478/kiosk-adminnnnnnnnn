@@ -105,6 +105,7 @@
   <!-- ── MAIN ── -->
   <main class="main">
 
+    <!-- TOPBAR -->
     <div class="topbar">
       <div class="topbar-left">
         <a href="./dashboard.html" class="back-btn">
@@ -116,58 +117,59 @@
       <div class="topbar-right">
         <div class="realtime-pill">
           <span class="live-dot"></span>
-          Live sync on
+          After changes - Sync changes
         </div>
       </div>
     </div>
 
+    <!-- CONTENT -->
     <div class="content">
 
-      <div class="page-heading-row fade-up" style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:24px;">
-        <div class="page-heading" style="margin-bottom:0;">
+      <!-- PAGE HEADER ROW -->
+      <div class="page-header-row fade-up">
+
+        <!-- Left: title + subtitle -->
+        <div class="page-heading">
           <div class="page-eyebrow">
             <span class="eyebrow-dot"></span>
             Promotions
           </div>
-          <h1 class="page-title" style="font-size:1.4rem;">Discount Items</h1>
-          <p class="page-sub" style="font-size:12px;max-width:320px;">Select any item and set a discounted price — original price always preserved</p>
+          <h1 class="page-title">Discount Items</h1>
+          <p class="page-sub">Select any item and set a discounted price — original price always preserved</p>
         </div>
 
-        <div class="card fade-up" style="animation-delay:0.06s; min-width:260px; max-width:300px; margin-bottom:0;">
-  <div class="card-header">
-    <div class="card-icon">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-    </div>
-    <div>
-      <div class="card-title">Ad Discount Percentage</div>
-      <div class="card-sub">Shown in promotional banners &amp; ads</div>
-    </div>
-  </div>
-  <div style="display:flex;align-items:center;gap:12px;margin-top:8px;">
-    <div class="disc-input-wrap" style="flex:1;">
-      <span class="disc-currency">%</span>
-      <input type="number" id="adDiscInput" class="disc-input"
-             placeholder="e.g. 20" min="1" max="100" style="padding-left:36px;" />
-    </div>
-    <button id="saveAdDiscBtn" class="btn-apply-discount" style="margin:0;width:auto;padding:0 20px;">
-      Save
-    </button>
-  </div>
-  <div id="adDiscStatus" style="font-size:12px;color:#aaa;margin-top:8px;min-height:16px;"></div>
-  <div id="adDiscStatus" style="font-size:12px;color:#aaa;margin-top:8px;min-height:16px;"></div>
-</div>
-      </div>  <!-- closes page-heading-row -->
-</div>
+        <!-- Right: Ad discount card -->
+        <div class="ad-disc-card fade-up" style="animation-delay:0.05s;">
+          <div class="ad-card-header">
+            <div class="ad-card-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+            </div>
+            <div>
+              <div class="ad-card-title">Ad Discount %</div>
+              <div class="ad-card-sub">Shown in promotional banners &amp; ads</div>
+            </div>
+          </div>
+          <div class="ad-input-row">
+            <div class="disc-input-wrap">
+              <span class="disc-currency">%</span>
+              <input type="number" id="adDiscInput" class="disc-input" placeholder="e.g. 20" min="1" max="100" />
+            </div>
+            <button id="saveAdDiscBtn" class="btn-save-ad">Save</button>
+          </div>
+          <div id="adDiscStatus" class="ad-disc-status"></div>
+        </div>
 
+      </div>
+      <!-- END PAGE HEADER ROW -->
 
-
-      <div class="two-col fade-up" style="animation-delay:0.08s">
+      <!-- TWO-COL LAYOUT -->
+      <div class="two-col fade-up" style="animation-delay:0.1s;">
 
         <!-- LEFT — All items -->
         <div class="card">
           <div class="card-header">
             <div class="card-icon">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
             </div>
             <div>
               <div class="card-title">All Menu Items</div>
@@ -180,7 +182,7 @@
             <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="text" id="searchInput" placeholder="Search by dish name..." class="search-input" />
             <button id="clearSearch" class="clear-search" style="display:none;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
           </div>
 
@@ -197,15 +199,16 @@
             </div>
           </div>
         </div>
+        <!-- END LEFT -->
 
         <!-- RIGHT — Form + active discounts -->
         <div class="right-panel">
 
-          <!-- Discount form -->
+          <!-- Discount form card (dark) -->
           <div class="discount-form-card">
             <div class="disc-form-header">
               <div class="disc-form-icon">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
               </div>
               <div>
                 <div class="disc-form-title">Apply Discount</div>
@@ -228,7 +231,7 @@
               </div>
             </div>
 
-            <!-- Live preview of savings -->
+            <!-- Live preview -->
             <div class="disc-preview-row hidden" id="discPreviewRow">
               <span class="dp-label">Preview</span>
               <div class="dp-values">
@@ -240,35 +243,43 @@
 
             <!-- Apply button -->
             <button id="applyBtn" class="btn-apply-discount" disabled>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
               Apply Discount
             </button>
 
             <!-- Remove button -->
             <button id="removeBtn" class="btn-remove-discount">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
               Remove Discount
             </button>
           </div>
+          <!-- END discount form card -->
 
-          <!-- Active discounts list -->
+          <!-- Active discounts list card -->
           <div class="active-disc-card">
             <div class="active-disc-header">
               <span class="active-disc-title">Active Discounts</span>
               <span class="active-disc-count" id="activeDiscCount">0</span>
             </div>
             <div id="activeDiscList" class="active-disc-list">
-              <div class="empty-state" style="padding:24px;">
+              <div class="empty-state" style="padding:22px;">
                 <span class="empty-icon">🏷️</span>
                 <span class="empty-title">No active discounts</span>
                 <span class="empty-hint">Applied discounts will appear here</span>
               </div>
             </div>
           </div>
+          <!-- END active discounts -->
 
         </div>
+        <!-- END RIGHT -->
+
       </div>
+      <!-- END TWO-COL -->
+
     </div>
+    <!-- END CONTENT -->
+
   </main>
 </div>
 

@@ -155,7 +155,7 @@ function buildTranslitField() {
     <input type="text" id="catNameHindi" placeholder="हिंदी नाम" 
            style="font-family:inherit;font-size:15px;" />
     <div style="font-size:11px;color:#aaa;margin-top:4px;">
-      Auto-transliterated · आप इसे edit कर सकते हैं
+      Auto-transliterated · आप इसे एडिट कर सकते हैं
     </div>
   `;
   // catName field ke baad insert karo

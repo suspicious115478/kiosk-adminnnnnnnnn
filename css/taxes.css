@@ -159,6 +159,17 @@
   min-height: 38px;
 }
 
+.topbar-left { display: flex; align-items: center; gap: 12px; }
+.back-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.78rem; font-weight: 500; color: var(--muted);
+  text-decoration: none; padding: 5px 10px;
+  border-radius: 7px; border: 1px solid var(--border);
+  background: var(--surface); transition: all 0.15s;
+}
+.back-btn:hover { color: var(--text); border-color: var(--border2); }
+.topbar-page-title { font-size: 0.82rem; font-weight: 600; color: var(--text2); }
+
 .tax-field-row-divided {
   border-top: 1px solid var(--border);
   padding-top: 16px;

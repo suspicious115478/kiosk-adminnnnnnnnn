@@ -56,7 +56,6 @@ document.getElementById("tabLive").addEventListener("click", () => {
   currentMode = "live";
   document.getElementById("tabLive").classList.add("active");
   document.getElementById("tabDate").classList.remove("active");
-  document.getElementById("liveBadgeRow").style.display = "block";
   document.getElementById("datePickerRow").style.display = "none";
   startLiveListener();
 });
@@ -65,7 +64,6 @@ document.getElementById("tabDate").addEventListener("click", () => {
   currentMode = "date";
   document.getElementById("tabDate").classList.add("active");
   document.getElementById("tabLive").classList.remove("active");
-  document.getElementById("liveBadgeRow").style.display = "none";
   document.getElementById("datePickerRow").style.display = "flex";
   stopListener();
   const today = new Date().toISOString().split("T")[0];
@@ -130,24 +128,102 @@ async function loadByDate(dateStr) {
 // ── Render ────────────────────────────────────────────────────────────────────
 function renderOrders(orders, flashIds = []) {
   updateSummary(orders);
+
+  const list = document.getElementById("ordersList");
+
   if (!orders.length) {
-    setEmptyState(currentMode === "live"
-      ? "No orders yet — waiting for new ones..."
-      : "No orders on this date");
+    list.innerHTML = `
+      <div class="orders-empty">
+        <span class="empty-icon">🧾</span>
+        <div class="empty-title">${currentMode === "live" ? "No orders yet — waiting for new ones..." : "No orders on this date"}</div>
+      </div>`;
     return;
   }
 
-  const list = document.getElementById("ordersList");
-  list.innerHTML = orders.map((order, i) =>
-    buildOrderCard(order, flashIds.includes(order.id), i)
-  ).join("");
+  // ── Smart DOM diff — sirf changed/new cards update karo ──
+  const existingCards = new Map(
+    [...list.querySelectorAll(".order-card[data-id]")].map(el => [el.dataset.id, el])
+  );
+  const incomingIds = new Set(orders.map(o => o.id));
 
-  list.querySelectorAll(".status-select").forEach(sel => {
+  // Remove cards jo ab nahi hain
+  existingCards.forEach((el, id) => {
+    if (!incomingIds.has(id)) {
+      el.style.transition = "opacity 0.3s, transform 0.3s";
+      el.style.opacity = "0";
+      el.style.transform = "translateY(-8px)";
+      setTimeout(() => el.remove(), 300);
+    }
+  });
+
+  // Empty state hata do
+  list.querySelector(".orders-empty")?.remove();
+
+  // Orders render karo — existing update, naye add karo
+  orders.forEach((order, i) => {
+    const isNew   = flashIds.includes(order.id);
+    const newHtml = buildOrderCard(order, isNew, i);
+
+    if (existingCards.has(order.id)) {
+      // Existing card — sirf content update karo, flicker nahi
+      const temp = document.createElement("div");
+      temp.innerHTML = newHtml;
+      const newCard = temp.firstElementChild;
+      const oldCard = existingCards.get(order.id);
+
+      // Sirf status change hua ho toh class update karo
+      if (oldCard.className !== newCard.className) {
+        oldCard.className = newCard.className;
+      }
+
+      // Header aur footer quietly update karo
+      const oldHeader = oldCard.querySelector(".order-header");
+      const newHeader = newCard.querySelector(".order-header");
+      if (oldHeader && newHeader && oldHeader.innerHTML !== newHeader.innerHTML) {
+        oldHeader.innerHTML = newHeader.innerHTML;
+        bindSelectListeners(oldCard, order.id);
+      }
+
+      const oldFooter = oldCard.querySelector(".order-footer");
+      const newFooter = newCard.querySelector(".order-footer");
+      if (oldFooter && newFooter && oldFooter.innerHTML !== newFooter.innerHTML) {
+        oldFooter.innerHTML = newFooter.innerHTML;
+      }
+
+    } else {
+      // Naya card — fade in ke saath add karo
+      const temp = document.createElement("div");
+      temp.innerHTML = newHtml;
+      const card = temp.firstElementChild;
+      card.style.opacity = "0";
+      card.style.transform = "translateY(12px)";
+
+      // Pehle existing cards se pehle insert karo (newest first)
+      const firstCard = list.querySelector(".order-card");
+      if (firstCard) {
+        list.insertBefore(card, firstCard);
+      } else {
+        list.appendChild(card);
+      }
+
+      // Smooth fade in
+      requestAnimationFrame(() => {
+        card.style.transition = "opacity 0.35s ease, transform 0.35s ease";
+        card.style.opacity = "1";
+        card.style.transform = "translateY(0)";
+      });
+
+      bindSelectListeners(card, order.id);
+    }
+  });
+}
+
+// ── Select listeners alag function mein ──
+function bindSelectListeners(card, orderId) {
+  card.querySelectorAll(".status-select").forEach(sel => {
     sel.addEventListener("change", async (e) => {
-      const orderId   = e.target.dataset.orderId;
       const newStatus = e.target.value;
       try {
-        // Write completedAt when status is set to COMPLETED from web side too
         const updateData = { status: newStatus };
         if (newStatus === "COMPLETED") updateData.completedAt = Date.now();
         if (newStatus === "PREPARING") updateData.preparingAt = Date.now();
@@ -164,7 +240,6 @@ function renderOrders(orders, flashIds = []) {
     });
   });
 }
-
 // ── Duration helper ───────────────────────────────────────────────────────────
 /**
  * Firestore timestamp ya plain millis dono handle karta hai.
@@ -241,7 +316,7 @@ function buildOrderCard(order, isNew, index) {
   ).join("");
 
   return `
-    <div class="order-card status-${status} ${isNew ? "new-flash" : ""}" style="animation-delay:${index * 40}ms">
+  <div class="order-card status-${status} ${isNew ? "new-flash" : ""}" data-id="${order.id}" style="animation-delay:${index * 40}ms">
       <div class="order-header">
         <div class="order-id">#${shortId}<span>${timeStr}</span></div>
         <span class="order-type-badge type-${orderType}">${typeLabel}</span>
@@ -260,7 +335,7 @@ function buildOrderCard(order, isNew, index) {
         </div>
       </div>
       <div class="order-footer">
-        <span class="order-time">${timeStr}</span>
+        
 <span class="order-total">₹${(total).toFixed(2)}</span>
       </div>
     </div>`;
@@ -268,11 +343,12 @@ function buildOrderCard(order, isNew, index) {
 
 // ── Summary bar ───────────────────────────────────────────────────────────────
 function updateSummary(orders) {
-  document.getElementById("sumTotal").textContent   = orders.length;
-document.getElementById("sumRevenue").textContent =
-  "₹" + orders.reduce((s, o) => s + (o.totalPrice || 0), 0).toFixed(2);
-  document.getElementById("sumNew").textContent  = orders.filter(o => o.status === "NEW").length;
-  document.getElementById("sumDone").textContent = orders.filter(o => o.status === "COMPLETED").length;
+  document.getElementById("sumTotal").textContent    = orders.length;
+  document.getElementById("sumRevenue").textContent  =
+    "₹" + orders.reduce((s, o) => s + (o.totalPrice || 0), 0).toFixed(2);
+  document.getElementById("sumNew").textContent      = orders.filter(o => o.status === "NEW").length;
+  document.getElementById("sumPrep").textContent     = orders.filter(o => o.status === "PREPARING").length;
+  document.getElementById("sumDone").textContent     = orders.filter(o => o.status === "COMPLETED").length;
 }
 
 function setLoadingState() {

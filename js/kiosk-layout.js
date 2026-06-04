@@ -77,7 +77,8 @@ function renderUI() {
   } else if (currentSavedLayout === "single_window") {
     statusText.textContent = "Active layout: Single Window";
   } else {
-    statusText.textContent = "Koi layout abhi set nahi hai";
+   statusText.textContent = "No layout is currently set";
+
   }
 
   // Reset all cards
@@ -107,15 +108,16 @@ function renderUI() {
   // Save button state
   if (selectedLayout && selectedLayout !== currentSavedLayout) {
     saveBtn.disabled = false;
-    saveHint.textContent = selectedLayout === "classic"
-      ? "Classic Layout select ki gayi hai"
-      : "Single Window select ki gayi hai";
+   saveHint.textContent = selectedLayout === "classic"
+  ? "Classic Layout selected"
+  : "Single Window selected";
+
   } else if (selectedLayout && selectedLayout === currentSavedLayout) {
     saveBtn.disabled = true;
-    saveHint.textContent = "Yeh layout already active hai";
+   saveHint.textContent = "This layout is already active";
   } else {
     saveBtn.disabled = true;
-    saveHint.textContent = "Pehle ek layout select karein";
+   saveHint.textContent = "Please select a layout first";
   }
 }
 
@@ -144,11 +146,11 @@ saveBtn.addEventListener("click", async () => {
 
     currentSavedLayout = selectedLayout;
     const layoutName = selectedLayout === "classic" ? "Classic Layout" : "Single Window";
-    showToast(`${layoutName} save ho gayi! ✅`);
+    showToast(`${layoutName} saved successfully! ✅`);
     renderUI();
 
   } catch (err) {
-    showToast("Save nahi hua: " + err.message, true);
+   showToast("Failed to save: " + err.message, true);
     saveBtn.disabled = false;
   } finally {
     saveBtn.innerHTML = `

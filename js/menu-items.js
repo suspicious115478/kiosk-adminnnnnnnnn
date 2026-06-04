@@ -80,7 +80,7 @@ function rowHTML(uid) {
           <span class="row-hindi-status" id="hindiStatus_${uid}" style="font-size:11px;color:#aaa;font-weight:400;"></span>
         </label>
         <input type="text" class="row-name-hindi" id="hindiInput_${uid}" placeholder="हिंदी नाम" style="font-family:inherit;" />
-        <div style="font-size:11px;color:#aaa;margin-top:4px;">Auto-transliterated · आप इसे edit कर सकते हैं</div>
+        <div style="font-size:11px;color:#aaa;margin-top:4px;">Auto-transliterated · आप इसे एडिट कर सकते हैं</div>
       </div>
 
       <div class="field">
@@ -398,7 +398,7 @@ function renderItems() {
   const list      = document.getElementById("itemsList");
   const countChip = document.getElementById("itemCount");
 
-  const filtered  = activeFilter === "all"
+  const filtered = activeFilter === "all"
     ? allItems
     : allItems.filter(i => i.categoryId === activeFilter);
 
@@ -414,8 +414,28 @@ function renderItems() {
     return;
   }
 
-  list.innerHTML = filtered.map((item, i) => `
-    <div class="item-card" style="animation-delay:${i * 0.04}s">
+  // ── Smart DOM diff — sirf naye cards add karo, existing untouched ──
+  const existingIds = new Set(
+    [...list.querySelectorAll(".item-card[data-id]")].map(el => el.dataset.id)
+  );
+  const newIds = new Set(filtered.map(item => item.id));
+
+  // Remove cards jo ab filtered mein nahi hain
+  list.querySelectorAll(".item-card[data-id]").forEach(el => {
+    if (!newIds.has(el.dataset.id)) el.remove();
+  });
+
+  // Empty state hata do agar tha
+  list.querySelector(".empty-state")?.remove();
+
+  // Naye cards add karo (jo already exist karte hain unhe skip karo)
+  filtered.forEach((item, i) => {
+    if (existingIds.has(item.id)) return; // already hai, flicker nahi
+
+    const card = document.createElement("div");
+    card.className = "item-card";
+    card.dataset.id = item.id;
+    card.innerHTML = `
       <img class="item-thumb" src="${item.image}" alt="${item.name}" loading="lazy" />
       <div class="item-info">
         <div class="item-name">${item.name}</div>
@@ -426,8 +446,9 @@ function renderItems() {
         </div>
       </div>
       <div class="item-price">₹${item.price}</div>
-    </div>
-  `).join("");
+    `;
+    list.appendChild(card);
+  });
 }
 
 // ── Upload all items ──────────────────────────────────────────────────────────

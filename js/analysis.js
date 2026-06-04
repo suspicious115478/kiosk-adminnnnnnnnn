@@ -4,7 +4,7 @@ import {
 } from "./firebase.js";
 
 import {
-  collection, query, orderBy, getDocs,
+  collection, query, orderBy,
   where, Timestamp, doc, updateDoc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
@@ -113,8 +113,14 @@ document.querySelectorAll(".sort-btn").forEach(btn => {
 });
 
 // ── Load orders from Firestore ────────────────────────────────────────────────
-async function loadOrders(startDate, endDate) {
+let _ordersUnsub = null;
+
+function loadOrders(startDate, endDate) {
   if (!restaurantId) return showToast("Restaurant not found", true);
+
+  // Purana listener band karo
+  if (_ordersUnsub) { _ordersUnsub(); _ordersUnsub = null; }
+
   showLoading();
 
   try {
@@ -135,9 +141,14 @@ async function loadOrders(startDate, endDate) {
       );
     }
 
-    const snap = await getDocs(q);
-    cachedOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderAnalysis(cachedOrders);
+    _ordersUnsub = onSnapshot(q, (snap) => {
+      cachedOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderAnalysis(cachedOrders);
+    }, (err) => {
+      showToast("Realtime error: " + err.message, true);
+      showEmptyTable("Failed to load data. Please try again.");
+    });
+
   } catch (err) {
     showToast("Failed to load orders: " + err.message, true);
     showEmptyTable("Failed to load data. Please try again.");
@@ -149,39 +160,41 @@ function renderAnalysis(orders) {
   // Aggregate item stats
   const itemMap = {}; // key: item name
 
-  orders.forEach(order => {
-    const items        = order.items || [];
-    const createdMs    = tsToMs(order.createdAt);
-    const completedMs  = tsToMs(order.completedAt);
-    const prepMs       = (createdMs && completedMs && completedMs > createdMs)
-                         ? (completedMs - createdMs) : null;
-    const isCompleted  = order.status === "COMPLETED";
+ orders.forEach(order => {
+  const items           = order.items || [];
+  const orderPreparingMs = tsToMs(order.preparingAt); // ← jab kitchen ne PREPARING kiya
 
-    items.forEach(item => {
-      const rawName = item.name || "Unknown";
-      const key     = rawName.trim().toLowerCase();
-      const qty     = Number(item.qty ?? item.quantity ?? 1);
-      const price   = Number(item.price ?? 0);
-      const revenue = price * qty;
+  const totalRevenue = orders.reduce((s, o) => s + (o.totalPrice || 0), 0); // bahar hai, yahan nahi
 
-      if (!itemMap[key]) {
-        itemMap[key] = {
-          name: rawName.trim(),
-          totalQty: 0,
-          totalRevenue: 0,
-          prepSamples: [],  // array of ms durations for completed orders
-        };
+  items.forEach(item => {
+    const rawName = item.name || "Unknown";
+    const key     = rawName.trim().toLowerCase();
+    const qty     = Number(item.qty ?? item.quantity ?? 1);
+    const price   = Number(item.price ?? 0);
+    const revenue = price * qty;
+
+    if (!itemMap[key]) {
+      itemMap[key] = {
+        name: rawName.trim(),
+        totalQty: 0,
+        totalRevenue: 0,
+        prepSamples: [],
+      };
+    }
+
+    itemMap[key].totalQty     += qty;
+    itemMap[key].totalRevenue += revenue;
+
+    // ✅ Item-level prep: preparedAt (jab tick kiya) - preparingAt (jab order preparing hua)
+    if (item.preparedAt && orderPreparingMs) {
+      const itemPreparedMs  = tsToMs(item.preparedAt);
+      const itemPrepDuration = itemPreparedMs - orderPreparingMs;
+      if (itemPrepDuration > 0) {
+        itemMap[key].prepSamples.push(itemPrepDuration);
       }
-
-      itemMap[key].totalQty     += qty;
-      itemMap[key].totalRevenue += revenue;
-
-      // Only count prep time from completed orders
-      if (isCompleted && prepMs !== null) {
-        itemMap[key].prepSamples.push(prepMs);
-      }
-    });
+    }
   });
+});
 
   // Convert to array and compute averages
   let items = Object.values(itemMap).map(it => ({
@@ -208,7 +221,7 @@ function renderAnalysis(orders) {
     ? formatDuration(fastest.avgPrepMs) + " avg prep time"
     : "No completed orders";
 
-  document.getElementById("totalRevenue").textContent   = "₹" + Math.round(totalRevenue).toLocaleString("en-IN");
+ document.getElementById("totalRevenue").textContent = "₹" + totalRevenue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   document.getElementById("totalOrders").textContent    = `${orders.length} order${orders.length !== 1 ? "s" : ""}`;
   document.getElementById("totalItemsSold").textContent = totalItemsSold.toLocaleString("en-IN");
   document.getElementById("uniqueItemsCount").textContent = `${items.length} unique dish${items.length !== 1 ? "es" : ""}`;
@@ -281,7 +294,7 @@ function buildRow(item, index, maxQty) {
           <span class="qty-number">${item.totalQty}</span>
         </div>
       </td>
-      <td class="num"><span class="revenue-val">₹${Math.round(item.totalRevenue).toLocaleString("en-IN")}</span></td>
+     <td class="num"><span class="revenue-val">₹${item.totalRevenue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></td>
       <td class="num">${prepHtml}</td>
     </tr>
   `;

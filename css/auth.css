@@ -531,3 +531,14 @@ body::after {
 @media (max-width: 400px) {
   .auth-form-side { padding: 28px 20px; }
 }
+.eye-btn {
+  position: absolute;
+  right: 12px; top: 50%;
+  transform: translateY(-50%);
+  background: none; border: none;
+  cursor: pointer; padding: 2px;
+  color: var(--muted);
+  display: flex; align-items: center;
+  transition: color 0.15s;
+}
+.eye-btn:hover { color: var(--text2); }

@@ -36,7 +36,16 @@ export async function getRestaurantName() {
   const user = auth.currentUser;
   if (!user) return null;
 
-  _restaurantName = user.email?.split("@")[0] || "My Restaurant";
+  // Firestore se actual restaurant name fetch karo
+  const { getDoc, doc } = await import(
+    "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"
+  );
+  const snap = await getDoc(doc(db, "restaurants", user.uid));
+  if (snap.exists() && snap.data().name) {
+    _restaurantName = snap.data().name;
+  } else {
+    _restaurantName = user.email?.split("@")[0] || "My Restaurant";
+  }
   return _restaurantName;
 }
 

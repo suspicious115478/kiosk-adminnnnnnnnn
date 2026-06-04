@@ -438,7 +438,9 @@ body::before {
   position: relative; overflow: hidden;
 }
 .action-card:hover {
-  border-color: var(--border2);
+  border-left-color: var(--border2);
+  border-right-color: var(--border2);
+  border-bottom-color: var(--border2);
   transform: translateY(-3px);
   box-shadow: 0 8px 24px rgba(0,0,0,0.08);
 }

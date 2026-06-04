@@ -533,6 +533,7 @@ body::before {
 .toast.show { transform: translateY(0); opacity: 1; }
 .toast.error { background: var(--red); }
 .toast.success { background: var(--green); }
+.sidebar-link[href="./kiosk-layout.html"] { display: none; }
 
 /* ── FADE UP ── */
 @keyframes fadeUp {

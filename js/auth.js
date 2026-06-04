@@ -19,6 +19,22 @@ import {
 // ── Redirect if already logged in ─────────────────────────────
 await redirectIfLoggedIn();
 
+// ── Password Validator ─────────────────────────────────────────
+function validatePassword(password) {
+  const checks = {
+    length:  password.length >= 8,
+    upper:   /[A-Z]/.test(password),
+    number:  /[0-9]/.test(password),
+    special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password),
+  };
+  const messages = [];
+  if (!checks.length)  messages.push("at least 8 characters");
+  if (!checks.upper)   messages.push("1 uppercase letter");
+  if (!checks.number)  messages.push("1 number");
+  if (!checks.special) messages.push("1 special character");
+  return messages; // empty array = valid
+}
+
 // ── Tab switching ──────────────────────────────────────────────
 document.querySelectorAll(".auth-tab").forEach(btn => {
   btn.addEventListener("click", () => {
@@ -119,7 +135,9 @@ document.getElementById("signupBtn").addEventListener("click", async () => {
 
   if (!email)            return showToast("Please enter your email address", true);
   if (!password)         return showToast("Please enter a password", true);
-  if (password.length < 6) return showToast("Password must be at least 6 characters", true);
+  const pwErrors = validatePassword(password);
+if (pwErrors.length > 0)
+  return showToast("Password needs: " + pwErrors.join(", "), true);
 
   const btn = document.getElementById("signupBtn");
   btn.disabled = true;
@@ -166,4 +184,18 @@ document.getElementById("forgotEmail").addEventListener("keydown", (e) => {
 });
 document.getElementById("signupPassword").addEventListener("keydown", (e) => {
   if (e.key === "Enter") document.getElementById("signupBtn").click();
+});
+// ── Eye toggle ─────────────────────────────────────────────────
+function togglePass(inputId, btn) {
+  const input = document.getElementById(inputId);
+  const isText = input.type === "text";
+  input.type = isText ? "password" : "text";
+  btn.style.color = isText ? "" : "var(--accent)";
+}
+
+document.getElementById("eyeLogin").addEventListener("click", function() {
+  togglePass("loginPassword", this);
+});
+document.getElementById("eyeSignup").addEventListener("click", function() {
+  togglePass("signupPassword", this);
 });

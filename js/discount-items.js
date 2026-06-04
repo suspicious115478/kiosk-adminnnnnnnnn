@@ -493,7 +493,7 @@ document.getElementById("saveAdDiscBtn").addEventListener("click", async () => {
   const status = document.getElementById("adDiscStatus");
   if (!val || val < 1 || val > 100) {
     status.style.color = "#e53935";
-    status.textContent = "1 se 100 ke beech value daalo";
+    status.textContent = "Please enter a value between 1 and 100";
     return;
   }
   const btn = document.getElementById("saveAdDiscBtn");
@@ -501,7 +501,7 @@ document.getElementById("saveAdDiscBtn").addEventListener("click", async () => {
   try {
     await updateDoc(doc(db, "restaurants", restaurantId), { discount_p_ad: val });
     status.style.color = "#2e7d32";
-    status.textContent = `Saved — ${val}% ads mein dikhega ✅`;
+   status.textContent = `Saved — ${val}% will appear in ads ✅`;
   } catch (e) {
     status.style.color = "#e53935";
     status.textContent = "Failed: " + e.message;

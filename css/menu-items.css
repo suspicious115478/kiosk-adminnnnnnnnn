@@ -397,6 +397,38 @@ body::before {
   box-shadow: 0 0 0 3px rgba(8,145,178,0.08);
 }
 
+/* ── Hindi description textarea ── */
+.row-desc-hindi {
+  width: 100%; padding: 9px 13px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  font-size: 0.83rem; font-family: inherit; line-height: 1.5;
+  background: var(--surface2); color: var(--text);
+  outline: none; resize: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.row-desc-hindi::placeholder { color: var(--muted); }
+.row-desc-hindi:focus {
+  border-color: var(--dish-clr);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px rgba(8,145,178,0.08);
+}
+
+/* ── Hindi name input ── */
+.row-name-hindi {
+  width: 100%; padding: 10px 13px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  font-size: 0.85rem; font-family: inherit;
+  background: var(--surface2); color: var(--text);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.row-name-hindi::placeholder { color: var(--muted); }
+.row-name-hindi:focus {
+  border-color: var(--dish-clr);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px rgba(8,145,178,0.08);
+}
+
 /* file upload */
 .field input[type="file"] { display: none; }
 .file-drop {
@@ -586,7 +618,12 @@ body::before {
 /* ── Description in item card ── */
 .item-desc {
   font-size: 0.72rem; color: var(--text2);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
   margin-bottom: 4px; line-height: 1.4;
 }
 .item-meta { display: flex; align-items: center; gap: 8px; }

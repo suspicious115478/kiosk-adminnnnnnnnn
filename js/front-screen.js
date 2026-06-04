@@ -19,6 +19,12 @@ const wordCountDisplay  = document.getElementById("wordCount");
 const ribbonItemsEl     = document.getElementById("ribbonItems");
 
 let currentHeroBase64 = null;  // ← yahan hero store hoga
+let ribbonTags = [];
+const MAX_TAGS = 12;
+const tagBox   = document.getElementById("tagBox");
+const tagInput = document.getElementById("ribbonInput");
+const wordCount = document.getElementById("wordCount");
+const tagHint   = document.getElementById("tagHint");
 
 // ── 1. Firestore se data load ──────────────────────────────────
 if (restaurantId) {
@@ -36,14 +42,15 @@ if (restaurantId) {
         changeHeroBtn.style.display = "flex";
       }
 
-      // Ribbon text
-      if (data.item_names) {
-  ribbonTags = data.item_names.split(",").map(i => i.trim()).filter(Boolean).slice(0, MAX_TAGS);
+    // Ribbon text
+if (data.item_names) {
+  const loaded = data.item_names.split(",").map(i => i.trim()).filter(Boolean).slice(0, MAX_TAGS);
+  ribbonTags.push(...loaded);
   renderTags();
 }
     }
   } catch (err) {
-    showToast("Data load failed: " + err.message, true);
+    showToast("Failed to load data: " + err.message, true);
   }
 }
 
@@ -63,7 +70,7 @@ heroInput.addEventListener("change", async (e) => {
     heroPreview.style.display = "block";
     uploadPlaceholder.style.display = "none";
     changeHeroBtn.style.display = "flex";
-    showToast("Image ready! Save karo.");
+    showToast("Image ready! Click Save to apply.");
   } catch (err) {
     showToast("Image error: " + err.message, true);
   }
@@ -86,14 +93,6 @@ heroDropZone.addEventListener("drop", (e) => {
 });
 
 // ── 3. Ribbon preview + word count ────────────────────────────
-// ── State ──────────────────────────────────────────────────────
-let ribbonTags = [];
-const MAX_TAGS = 12;
-
-const tagBox       = document.getElementById("tagBox");
-const tagInput     = document.getElementById("ribbonInput");
-const wordCount    = document.getElementById("wordCount");
-const tagHint      = document.getElementById("tagHint");
 
 // ── Tags render ────────────────────────────────────────────────
 function renderTags() {
@@ -159,12 +158,12 @@ function updateRibbonPreview() {
 saveBtn.addEventListener("click", async () => {
   // Validation
   if (!currentHeroBase64) {
-    showToast("Pehle hero image upload karo", true);
+    showToast("Please upload a hero image first", true);
     return;
   }
  if (!ribbonTags.length) { showToast("Kam se kam ek ribbon item add karo", true); return; }
   if (!restaurantId) {
-    showToast("Restaurant ID nahi mila, logout karke login karo", true);
+    showToast("Restaurant ID not found, please log out and sign in again", true);
     return;
   }
 
@@ -177,7 +176,7 @@ saveBtn.addEventListener("click", async () => {
      item_names: ribbonTags.join(", "),
       sync: true
     });
-    showToast("Front Screen save ho gaya! ✅");
+    showToast("Front Screen saved successfully! ✅");
   } catch (err) {
     showToast("Save failed: " + err.message, true);
     console.error("Firestore save error:", err);

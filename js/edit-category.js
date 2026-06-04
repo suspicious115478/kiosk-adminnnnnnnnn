@@ -23,7 +23,6 @@ if (!categoryId) window.location.href = "./edit-menu.html";
 
 document.getElementById("pageTitle").textContent       = catName;
 document.getElementById("topbarTitle").textContent     = catName;
-document.getElementById("breadcrumbName").textContent  = catName;
 
 bindPreview("editImage", "editPreview");
 
