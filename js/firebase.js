@@ -137,6 +137,7 @@ export function compressImage(file, maxSize = 400) {
   });
 }
 
+
 // ── Preview helper ─────────────────────────────────────────────
 export function bindPreview(inputId, previewId) {
   const input = document.getElementById(inputId);

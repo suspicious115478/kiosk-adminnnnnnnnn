@@ -131,6 +131,15 @@ function rowHTML(uid) {
           </button>
         </div>
       </div>
+
+      <div class="field">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;">
+          <label style="margin-bottom:0;">Customizations <span style="font-size:0.68rem;font-weight:400;color:var(--muted);">(optional)</span></label>
+          <button type="button" class="add-custom-btn" data-uid="${uid}" style="font-size:0.72rem;font-weight:600;color:var(--dish-clr);background:var(--dish-bg);border:1px solid var(--dish-brd);border-radius:6px;padding:3px 9px;cursor:pointer;">+ Add</button>
+        </div>
+        <div class="custom-list" id="customList_${uid}"></div>
+      </div>
+
     </div>
   `;
 }
@@ -259,6 +268,44 @@ nameInput.addEventListener("input", () => {
       }, 180);
     });
   }
+
+  // Customizations
+  const addCustomBtn = row.querySelector(".add-custom-btn");
+  const customList   = document.getElementById(`customList_${uid}`);
+
+  addCustomBtn.addEventListener("click", () => {
+    const entry = document.createElement("div");
+    entry.style.cssText = "margin-bottom:10px;";
+    entry.innerHTML = `
+  <div style="display:flex;gap:7px;align-items:center;margin-bottom:5px;">
+    <input type="text" placeholder="e.g. Extra Cheese" style="flex:1;padding:8px 11px;border:1px solid var(--border);border-radius:8px;font-size:0.82rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;" class="custom-name" />
+    <input type="number" placeholder="₹0" min="0" style="width:80px;padding:8px 11px;border:1px solid var(--border);border-radius:8px;font-size:0.82rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;" class="custom-price" />
+    <input type="number" placeholder="Max" min="1" title="Max quantity user can add" style="width:64px;padding:8px 11px;border:1px solid var(--border);border-radius:8px;font-size:0.82rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;" class="custom-maxqty" />
+    <button type="button" style="width:26px;height:26px;border-radius:6px;background:var(--red-bg);border:1px solid var(--red-brd);color:var(--red);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" onclick="this.closest('div[style]').remove()">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <input type="text" class="custom-name-l2" placeholder="हिंदी नाम (auto)" style="display:none;width:100%;padding:7px 11px;border:1px solid var(--border);border-radius:8px;font-size:0.8rem;font-family:inherit;background:var(--surface2);color:var(--text);outline:none;" />
+    `;
+    customList.appendChild(entry);
+
+    const nameInput = entry.querySelector(".custom-name");
+    const l2Input   = entry.querySelector(".custom-name-l2");
+    let   l2Timer   = null;
+
+    nameInput.addEventListener("input", () => {
+      const val = nameInput.value.trim();
+      clearTimeout(l2Timer);
+      if (!val) { l2Input.style.display = "none"; l2Input.value = ""; return; }
+      l2Input.style.display = "block";
+      l2Input.placeholder = "translating...";
+      l2Timer = setTimeout(async () => {
+        const result = await transliterateText(val);
+        l2Input.value = result || "";
+        l2Input.placeholder = "हिंदी नाम (auto)";
+      }, 500);
+    });
+  });
 }
 
 // ── Add a new row ─────────────────────────────────────────────────────────────
@@ -476,7 +523,19 @@ document.getElementById("uploadItemBtn").addEventListener("click", async () => {
 
 const hindiVal  = row.querySelector(".row-name-hindi")?.value.trim() || null;
     const hindiDesc = row.querySelector(".row-desc-hindi")?.value.trim() || null;
-    items.push({ name, price: Number(price), desc, file, hindiName: hindiVal, hindiDesc });
+
+    const customizations = [];
+for (const entry of row.querySelectorAll(`#customList_${row.dataset.uid} > div`)) {
+  const cName  = entry.querySelector(".custom-name")?.value.trim();
+  const cPrice = entry.querySelector(".custom-price")?.value;
+  if (cName) {
+    const cNameL2 = entry.querySelector(".custom-name-l2")?.value.trim() || null;
+   const cMaxQty = entry.querySelector(".custom-maxqty")?.value;
+customizations.push({ name: cName, name_l2: cNameL2 || null, price: cPrice ? Number(cPrice) : 0, maxQty: cMaxQty ? Number(cMaxQty) : null });
+  }
+}
+
+    items.push({ name, price: Number(price), desc, file, hindiName: hindiVal, hindiDesc, customizations });
   }
 
   // ── Upload ──
@@ -501,6 +560,7 @@ const hindiVal  = row.querySelector(".row-name-hindi")?.value.trim() || null;
         image,
         categoryId,
         categoryName,
+        customizations: item.customizations.length ? item.customizations : [],
         available:     true,
         createdAt:     Date.now()
     }

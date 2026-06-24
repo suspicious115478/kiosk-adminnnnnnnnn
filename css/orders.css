@@ -308,6 +308,24 @@ body::before {
 }
 .order-id span { font-size: 0.72rem; color: var(--muted); font-weight: 400; font-family: 'Inter', sans-serif; margin-left: 6px; }
 
+/* ── Add this block to your orders.css ─────────────────────────────────────
+   Paste anywhere after the .completion-time-badge rule
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* "Stock Updated" badge — shown on order cards after inventory was deducted */
+.inv-deducted-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: #F5F3FF;
+  border: 1px solid #DDD6FE;
+  border-radius: 99px;
+  font-size: 0.71rem;
+  font-weight: 600;
+  color: #6D28D9;
+  white-space: nowrap;
+}
 .order-type-badge {
   display: inline-flex; align-items: center;
   font-size: 0.67rem; font-weight: 700; letter-spacing: 0.06em;

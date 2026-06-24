@@ -1,11 +1,14 @@
+//ye mera current version ahi
+
 import {
   db, requireAuth, getRestaurantId, getRestaurantName,
   handleLogout, showToast, compressImage
 } from "./firebase.js";
 
 import {
-  collection, query, orderBy, onSnapshot,
-  getDocs, where, doc, updateDoc, Timestamp
+  collection, doc, getDoc, getDocs, addDoc,
+  query, orderBy, onSnapshot, where, updateDoc,
+  Timestamp, runTransaction, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 await requireAuth();
@@ -36,20 +39,22 @@ document.getElementById("logoInput").addEventListener("change", async (e) => {
 });
 if (restaurantId) {
   onSnapshot(doc(db, "restaurants", restaurantId), (snap) => {
-    if (!snap.exists()) return;
-    const data = snap.data();
-    if (data.logo) showLogoPreview(data.logo);
-    if (data.brandColor) {
-      const dot = document.getElementById("colorDot");
-      if (dot) dot.style.background = data.brandColor;
-    }
-  });
+  if (!snap.exists()) return;
+  const data = snap.data();
+  if (data.logo) showLogoPreview(data.logo);
+  if (data.brandColor) {
+    const dot = document.getElementById("colorDot");
+    if (dot) dot.style.background = data.brandColor;
+  }
+  if (data.stockMode) stockMode = data.stockMode;
+});
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let currentMode   = "live";
 let unsubscribeFn = null;
 let knownOrderIds = new Set();
+let stockMode = "manual"; // default safe
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 document.getElementById("tabLive").addEventListener("click", () => {
@@ -140,13 +145,12 @@ function renderOrders(orders, flashIds = []) {
     return;
   }
 
-  // ── Smart DOM diff — sirf changed/new cards update karo ──
   const existingCards = new Map(
     [...list.querySelectorAll(".order-card[data-id]")].map(el => [el.dataset.id, el])
   );
   const incomingIds = new Set(orders.map(o => o.id));
 
-  // Remove cards jo ab nahi hain
+  // Remove stale cards
   existingCards.forEach((el, id) => {
     if (!incomingIds.has(id)) {
       el.style.transition = "opacity 0.3s, transform 0.3s";
@@ -156,11 +160,9 @@ function renderOrders(orders, flashIds = []) {
     }
   });
 
-  // Empty state hata do
   list.querySelector(".orders-empty")?.remove();
 
-  // Orders render karo — existing update, naye add karo
- orders.forEach((order, i) => {
+  orders.forEach((order, i) => {
     const isNew   = flashIds.includes(order.id);
     const newHtml = buildOrderCard(order, isNew, i);
 
@@ -178,7 +180,7 @@ function renderOrders(orders, flashIds = []) {
       const newHeader = newCard.querySelector(".order-header");
       if (oldHeader && newHeader && oldHeader.innerHTML !== newHeader.innerHTML) {
         oldHeader.innerHTML = newHeader.innerHTML;
-        bindSelectListeners(oldCard, order.id);
+        bindSelectListeners(oldCard, order.id, order);
       }
 
       const oldFooter = oldCard.querySelector(".order-footer");
@@ -187,7 +189,6 @@ function renderOrders(orders, flashIds = []) {
         oldFooter.innerHTML = newFooter.innerHTML;
       }
 
-      // ✅ Card ko correct position pe move karo
       list.appendChild(oldCard);
 
     } else {
@@ -204,38 +205,265 @@ function renderOrders(orders, flashIds = []) {
         card.style.transform = "translateY(0)";
       });
 
-      bindSelectListeners(card, order.id);
+      bindSelectListeners(card, order.id, order);
     }
   });
 }
 
-// ── Select listeners alag function mein ──
-function bindSelectListeners(card, orderId) {
+// ── Status select listeners ───────────────────────────────────────────────────
+function bindSelectListeners(card, orderId, orderData) {
   card.querySelectorAll(".status-select").forEach(sel => {
     sel.addEventListener("change", async (e) => {
       const newStatus = e.target.value;
+      const oldStatus = e.target.dataset.oldStatus;
+
+      // Disable select during update
+      sel.disabled = true;
+
       try {
         const updateData = { status: newStatus };
         if (newStatus === "COMPLETED") updateData.completedAt = Date.now();
         if (newStatus === "PREPARING") updateData.preparingAt = Date.now();
+
         await updateDoc(
           doc(db, "restaurants", restaurantId, "orders", orderId),
           updateData
         );
+
+        // ── Inventory deduction on PREPARING (ya seedha COMPLETED, Preparing skip ho to) ──
+// Only deduct once per order (guard: inventoryDeducted flag on order doc)
+const alreadyPastPreparing =
+  (oldStatus === "PREPARING" || oldStatus === "COMPLETED");
+
+if (
+  (newStatus === "PREPARING" || newStatus === "COMPLETED") &&
+  !alreadyPastPreparing
+) {
+
+  // Prepared stock hamesha deduct hoga
+  await deductPreparedStockForOrder(orderData);
+
+  // Raw stock sirf auto mode me
+  if (stockMode === "auto") {
+    await deductInventoryForOrder(orderId, orderData);
+  }
+}
+
         showToast("Status updated ✅");
+        e.target.dataset.oldStatus = newStatus;
       } catch (err) {
         showToast("Failed to update status: " + err.message, true);
-        e.target.value = e.target.dataset.oldStatus;
+        e.target.value = oldStatus;
+      } finally {
+        sel.disabled = false;
       }
-      e.target.dataset.oldStatus = newStatus;
     });
   });
 }
-// ── Duration helper ───────────────────────────────────────────────────────────
+
+// ── Inventory deduction logic ─────────────────────────────────────────────────
 /**
- * Firestore timestamp ya plain millis dono handle karta hai.
- * Returns milliseconds as Number, or null if invalid.
+ * For each item in the order:
+ *   1. Recipe dhundhte hain name se (menuItemName field) — kyunki Android menuItemId save nahi karta
+ *   2. For each ingredient: deduct (ingredient.qty * item.qty) from inventory_raw stock
+ *   3. Write a stock_history entry
+ *   4. Mark order as inventoryDeducted: true to prevent double-deduction
  */
+
+// Recipes — realtime listener, kabhi stale nahi rahega
+let recipesByName = {}; // menuItemName (lowercase) → recipe data
+
+onSnapshot(
+  collection(db, "restaurants", restaurantId, "recipes"),
+  (snap) => {
+    recipesByName = {};
+    snap.forEach(d => {
+      const data = d.data();
+      if (data.menuItemName) {
+        recipesByName[data.menuItemName.trim().toLowerCase()] = data;
+      }
+    });
+    console.log("✅ Recipes loaded:", Object.keys(recipesByName));   // ADD
+  },
+  (err) => console.error("❌ Recipes listener error:", err)          // ADD
+);
+
+function findRecipeByName(itemName) {
+  const key = (itemName || "").trim().toLowerCase();
+  return recipesByName[key] || null;
+}
+
+async function deductInventoryForOrder(orderId, orderData) {
+  // Re-fetch order — inventoryDeducted flag check (double-deduction guard)
+  const orderRef  = doc(db, "restaurants", restaurantId, "orders", orderId);
+  const orderSnap = await getDoc(orderRef);
+  if (!orderSnap.exists()) return;
+
+  const freshOrder = orderSnap.data();
+  if (freshOrder.inventoryDeducted) return; // pehle ho chuka hai
+
+  const items = freshOrder.items || orderData?.items || [];
+  if (!items.length) return;
+
+  const deductions = [];
+
+  // Har order item ke liye recipe dhundho — name se match
+  for (const item of items) {
+    const itemName = item.name || "";
+    if (!itemName) continue;
+
+    const recipe = await findRecipeByName(itemName);
+    if (!recipe) continue; // is item ki recipe nahi bani — skip
+
+    const orderQty     = item.qty ?? item.quantity ?? 1;
+    const recipeYield  = recipe.yield || 1;
+    // Servings this order item needs = orderQty / recipeYield
+    const servings     = orderQty / recipeYield;
+
+    for (const ing of (recipe.ingredients || [])) {
+      const deductQty = ing.qty * servings;
+      if (!ing.rawId || deductQty <= 0) continue;
+      deductions.push({
+        rawId:      ing.rawId,
+        rawName:    ing.rawName,
+        deductQty,
+        unitSymbol: ing.unitSymbol || ing.unitName || "",
+      });
+    }
+  }
+
+  if (!deductions.length) {
+  await updateDoc(orderRef, {
+    inventoryDeducted: true,
+    inventoryDeductedAt: Date.now()
+  });
+  return;
+}
+
+  // Merge deductions for same rawId (if same ingredient appears in multiple items)
+  const merged = {};
+  for (const d of deductions) {
+    if (merged[d.rawId]) {
+      merged[d.rawId].deductQty += d.deductQty;
+    } else {
+      merged[d.rawId] = { ...d };
+    }
+  }
+
+  const shortOrderId = (freshOrder.orderId || orderId).slice(0, 6).toUpperCase();
+  const insufficientItems = [];
+
+  // Apply deductions using Firestore transactions (atomic per raw material)
+  for (const [rawId, d] of Object.entries(merged)) {
+    const rawRef = doc(db, "restaurants", restaurantId, "inventory_raw", rawId);
+    try {
+      await runTransaction(db, async (tx) => {
+        const rawSnap = await tx.get(rawRef);
+        if (!rawSnap.exists()) return; // Material deleted — skip
+
+        const currentStock = typeof rawSnap.data().stock === "number"
+          ? rawSnap.data().stock : 0;
+        const newStock = Math.max(0, currentStock - d.deductQty);
+
+        if (currentStock < d.deductQty) {
+          insufficientItems.push(`${d.rawName} (need ${fmt(d.deductQty)}, have ${fmt(currentStock)})`);
+        }
+
+        tx.update(rawRef, { stock: newStock });
+
+        // Write history — addDoc can't be inside a transaction,
+        // so we queue it after the transaction
+        d._prevStock = currentStock;
+        d._newStock  = newStock;
+      });
+
+      // Write stock_history after transaction succeeds
+      const histRef = collection(
+        db, "restaurants", restaurantId, "inventory_raw", rawId, "stock_history"
+      );
+      await addDoc(histRef, {
+        type:      "deduct",
+        qty:       d.deductQty,
+        prevQty:   d._prevStock,
+        newQty:    d._newStock,
+        note:      `Auto-deducted — Order #${shortOrderId}`,
+        orderId:   orderId,
+        createdAt: serverTimestamp(),
+      });
+
+    } catch (txErr) {
+      console.warn(`Inventory deduction failed for ${d.rawName}:`, txErr.message);
+    }
+  }
+
+ 
+
+  // Mark order as deducted
+  await updateDoc(orderRef, {
+    inventoryDeducted:    true,
+    inventoryDeductedAt:  Date.now(),
+  });
+
+  // Notify about low/insufficient stock
+  if (insufficientItems.length) {
+    showToast(
+      `⚠️ Low stock: ${insufficientItems.slice(0, 2).join(", ")}${insufficientItems.length > 2 ? " & more" : ""}`,
+      true
+    );
+  } else {
+    showToast("📦 Inventory updated");
+  }
+}
+
+function fmt(n) {
+  return Number.isInteger(n) ? n : parseFloat(n.toFixed(3));
+}
+
+// ── Prepared stock deduction ──────────────────────────────────────────────────
+async function deductPreparedStockForOrder(orderData) {
+  const items = orderData.items || [];
+  if (!items.length) return;
+
+  for (const item of items) {
+    const itemName = (item.name || "").trim().toLowerCase();
+    if (!itemName) continue;
+
+    const orderQty = item.qty ?? item.quantity ?? 1;
+
+    // prepared_stocks me name se match karo
+    const prepSnap = await getDocs(
+      query(
+        collection(db, "restaurants", restaurantId, "prepared_stocks"),
+        where("menuItemName", "==", item.name.trim())
+      )
+    );
+
+    if (prepSnap.empty) continue;
+
+    const prepDoc    = prepSnap.docs[0];
+    const prepRef    = doc(db, "restaurants", restaurantId, "prepared_stocks", prepDoc.id);
+    const currentQty = typeof prepDoc.data().stock === "number" ? prepDoc.data().stock : 0;
+    const newQty     = Math.max(0, currentQty - orderQty);
+
+    await updateDoc(prepRef, { stock: newQty });
+
+    // History bhi likhte hain
+    const histRef = collection(
+      db, "restaurants", restaurantId, "prepared_stocks", prepDoc.id, "stock_history"
+    );
+    const shortOrderId = (orderData.orderId || "").slice(0, 6).toUpperCase();
+    await addDoc(histRef, {
+      type:      "deduct",
+      qty:       orderQty,
+      prevQty:   currentQty,
+      newQty,
+      note:      `Auto-deducted — Order #${shortOrderId}`,
+      createdAt: serverTimestamp()
+    });
+  }
+}
+
+// ── Duration helper ───────────────────────────────────────────────────────────
 function tsToMs(ts) {
   if (!ts) return null;
   if (typeof ts === "number") return ts;
@@ -244,9 +472,6 @@ function tsToMs(ts) {
   return null;
 }
 
-/**
- * Milliseconds ko "X min" ya "X hr Y min" format mein return karta hai.
- */
 function formatDuration(ms) {
   if (ms == null || ms < 0) return null;
   const totalSec = Math.floor(ms / 1000);
@@ -272,14 +497,11 @@ function buildOrderCard(order, isNew, index) {
   const typeLabel     = { DINE_IN: "Dine In", TAKEAWAY: "Takeaway", KIOSK: "Kiosk" }[orderType] || orderType;
   const statusOptions = ["NEW", "PREPARING", "COMPLETED"];
 
-  // ── Completion time badge ──────────────────────────────────────────────────
-  // Show only when status is COMPLETED and timestamps are available.
-  // We use createdAt → completedAt for total time.
+  // Completion time badge
   let completionBadgeHtml = "";
   if (status === "COMPLETED") {
     const createdMs   = tsToMs(order.createdAt);
     const completedMs = tsToMs(order.completedAt);
-
     if (createdMs && completedMs && completedMs > createdMs) {
       const duration = formatDuration(completedMs - createdMs);
       if (duration) {
@@ -294,11 +516,19 @@ function buildOrderCard(order, isNew, index) {
     }
   }
 
+  // Inventory deducted badge
+  const invBadgeHtml = order.inventoryDeducted
+    ? `<span class="inv-deducted-badge" title="Inventory deducted for this order">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        Stock Updated
+      </span>`
+    : "";
+
   const itemsHtml = items.map(item => `
     <div class="order-item-row">
       <span class="order-item-qty">×${item.qty ?? item.quantity ?? 1}</span>
       <span class="order-item-name">${item.name}</span>
-<span class="order-item-price">₹${((item.price ?? 0) * (item.qty ?? item.quantity ?? 1)).toFixed(2)}</span>
+      <span class="order-item-price">₹${((item.price ?? 0) * (item.qty ?? item.quantity ?? 1)).toFixed(2)}</span>
     </div>
   `).join("");
 
@@ -308,28 +538,28 @@ function buildOrderCard(order, isNew, index) {
 
   return `
   <div class="order-card status-${status} ${isNew ? "new-flash" : ""}" data-id="${order.id}" style="animation-delay:${index * 40}ms">
-      <div class="order-header">
-        <div class="order-id">#${shortId}<span>${timeStr}</span></div>
-        <span class="order-type-badge type-${orderType}">${typeLabel}</span>
-        <span class="status-badge-pill s-${status}">
-          ${statusDot(status)} ${statusLabel(status)}
-        </span>
-        ${completionBadgeHtml}
-       ${payStatus ? `<span class="payment-badge ps-${payStatus.toLowerCase()}">${{"PENDING":"🟡 Pending","SUCCESS":"🟢 Paid","FAILED":"🔴 Failed","CANCELLED":"⚫ Cancelled"}[payStatus]||payStatus}</span>` : ""}
-        <select class="status-select" data-order-id="${order.id}" data-old-status="${status}">
-          ${statusOptsHtml}
-        </select>
+    <div class="order-header">
+      <div class="order-id">#${shortId}<span>${timeStr}</span></div>
+      <span class="order-type-badge type-${orderType}">${typeLabel}</span>
+      <span class="status-badge-pill s-${status}">
+        ${statusDot(status)} ${statusLabel(status)}
+      </span>
+      ${completionBadgeHtml}
+      ${invBadgeHtml}
+      ${payStatus ? `<span class="payment-badge ps-${payStatus.toLowerCase()}">${{"PENDING":"🟡 Pending","SUCCESS":"🟢 Paid","FAILED":"🔴 Failed","CANCELLED":"⚫ Cancelled"}[payStatus]||payStatus}</span>` : ""}
+      <select class="status-select" data-order-id="${order.id}" data-old-status="${status}">
+        ${statusOptsHtml}
+      </select>
+    </div>
+    <div class="order-body">
+      <div class="order-items-list">
+        ${itemsHtml || '<div style="color:var(--muted); font-size:0.82rem;">No items found</div>'}
       </div>
-      <div class="order-body">
-        <div class="order-items-list">
-          ${itemsHtml || '<div style="color:var(--muted); font-size:0.82rem;">No items found</div>'}
-        </div>
-      </div>
-      <div class="order-footer">
-        
-<span class="order-total">₹${(total).toFixed(2)}</span>
-      </div>
-    </div>`;
+    </div>
+    <div class="order-footer">
+      <span class="order-total">₹${(total).toFixed(2)}</span>
+    </div>
+  </div>`;
 }
 
 // ── Summary bar ───────────────────────────────────────────────────────────────

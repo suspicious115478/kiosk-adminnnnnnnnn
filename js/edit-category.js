@@ -196,6 +196,12 @@ window.openEdit = (id) => {
   document.getElementById("editDescHindiStatus").textContent = "(optional)";
   document.getElementById("editImage").value      = "";
   document.getElementById("editPreview").style.display = "none";
+
+  // Customizations populate karo
+  const editCustomList = document.getElementById("editCustomList");
+  editCustomList.innerHTML = "";
+  (item.customizations || []).forEach(cus => addEditCustomRow(cus.name, cus.price, cus.name_l2));
+
   document.getElementById("editModal").classList.add("open");
 
   // Name transliteration
@@ -238,6 +244,43 @@ window.openEdit = (id) => {
 
 
 
+function addEditCustomRow(name = "", price = "", l2 = "") {
+  const editCustomList = document.getElementById("editCustomList");
+  const entry = document.createElement("div");
+  entry.style.cssText = "margin-bottom:10px;";
+  entry.innerHTML = `
+    <div style="display:flex;gap:7px;align-items:center;margin-bottom:5px;">
+      <input type="text" placeholder="e.g. Extra Cheese" value="${name}" style="flex:1;padding:8px 11px;border:1px solid var(--border);border-radius:8px;font-size:0.82rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;" class="edit-custom-name" />
+      <input type="number" placeholder="₹0" min="0" value="${price}" style="width:80px;padding:8px 11px;border:1px solid var(--border);border-radius:8px;font-size:0.82rem;font-family:inherit;background:var(--surface);color:var(--text);outline:none;" class="edit-custom-price" />
+      <button type="button" style="width:26px;height:26px;border-radius:6px;background:var(--red-bg);border:1px solid var(--red-brd);color:var(--red);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;" onclick="this.closest('div[style]').remove()">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <input type="text" class="edit-custom-name-l2" placeholder="हिंदी नाम (auto)" value="${l2}" style="width:100%;padding:7px 11px;border:1px solid var(--border);border-radius:8px;font-size:0.8rem;font-family:inherit;background:var(--surface2);color:var(--text);outline:none;" />
+  `;
+  editCustomList.appendChild(entry);
+
+  const nameInput = entry.querySelector(".edit-custom-name");
+  const l2Input   = entry.querySelector(".edit-custom-name-l2");
+  let   l2Timer   = null;
+
+  nameInput.addEventListener("input", () => {
+    const val = nameInput.value.trim();
+    clearTimeout(l2Timer);
+    if (!val) { l2Input.value = ""; return; }
+    l2Input.placeholder = "translating...";
+    l2Timer = setTimeout(async () => {
+      const result = await transliterateText(val);
+      l2Input.value = result || "";
+      l2Input.placeholder = "हिंदी नाम (auto)";
+    }, 500);
+  });
+}
+
+document.getElementById("editAddCustomBtn").addEventListener("click", () => {
+  addEditCustomRow();
+});
+
 document.getElementById("editModalClose").addEventListener("click", () => {
   document.getElementById("editModal").classList.remove("open");
   _editId = null;
@@ -264,7 +307,14 @@ document.getElementById("editSaveBtn").addEventListener("click", async () => {
   const newDesc      = document.getElementById("editDesc").value.trim();
     const newHindiName = document.getElementById("editNameHindi").value.trim();
     const newDescHindi = document.getElementById("editDescHindi").value.trim();
-    const updateData   = { name: newName, price: Number(newPrice), description: newDesc, item_name_l2: newHindiName || null, description_l2: newDescHindi || null };
+    const customizations = [];
+    document.querySelectorAll("#editCustomList > div").forEach(entry => {
+      const cName  = entry.querySelector(".edit-custom-name")?.value.trim();
+      const cPrice = entry.querySelector(".edit-custom-price")?.value;
+      const cL2    = entry.querySelector(".edit-custom-name-l2")?.value.trim() || null;
+      if (cName) customizations.push({ name: cName, name_l2: cL2, price: cPrice ? Number(cPrice) : 0 });
+    });
+    const updateData   = { name: newName, price: Number(newPrice), description: newDesc, item_name_l2: newHindiName || null, description_l2: newDescHindi || null, customizations };
     if (file) updateData.image = await compressImage(file, 400);
     await updateDoc(
       doc(db, "restaurants", restaurantId, "categories", categoryId, "menu_items", _editId),

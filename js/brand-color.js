@@ -21,6 +21,8 @@ const DEFAULT_COLOR = "#FF5F1F";
 // ── State ─────────────────────────────────────────────────────────────────────
 let currentHex = DEFAULT_COLOR;
 let brightness = 1.0;
+let currentFrontHex = DEFAULT_COLOR;
+let activeTarget = "brand"; // "brand" | "front"
 
 // ── Presets ───────────────────────────────────────────────────────────────────
 const PRESETS = [
@@ -124,7 +126,13 @@ function moveCursor(x, y, hex) {
 
 // ── Apply color to UI ─────────────────────────────────────────────────────────
 function applyColor(hex) {
-  currentHex = hex;
+  if (activeTarget === "brand") {
+    currentHex = hex;
+    document.getElementById("colorDot").style.background = hex;
+  } else {
+    currentFrontHex = hex;
+  }
+
   const { r, g, b } = hexToRgb(hex);
 
   document.getElementById("swatchPreview").style.background = hex;
@@ -132,7 +140,6 @@ function applyColor(hex) {
   document.getElementById("swatchRgb").textContent = `rgb(${r}, ${g}, ${b})`;
   document.getElementById("swatchBar").style.background = hex;
   document.getElementById("hexLiveDot").style.background = hex;
-  document.getElementById("colorDot").style.background   = hex;
 
   const hexInput = document.getElementById("hexInput");
   if (document.activeElement !== hexInput) {
@@ -149,6 +156,8 @@ function applyColor(hex) {
     dot.classList.toggle("active", dot.dataset.color.toUpperCase() === hex.toUpperCase());
   });
 }
+
+
 
 function rgbToHue(r, g, b) {
   r /= 255; g /= 255; b /= 255;
@@ -206,6 +215,8 @@ document.getElementById("hexInput").addEventListener("input", (e) => {
   if (val.length === 6) applyColor("#" + val.toUpperCase());
 });
 
+
+
 // ── Presets ───────────────────────────────────────────────────────────────────
 const presetGrid = document.getElementById("presetGrid");
 PRESETS.forEach(color => {
@@ -224,22 +235,35 @@ document.getElementById("defaultColorBtn").addEventListener("click", () => {
   showToast(`Default color restored: ${DEFAULT_COLOR}`);
 });
 
-// ── Saved indicator ───────────────────────────────────────────────────────────
-function showSavedIndicator(hex) {
-  document.getElementById("savedCard").style.display = "flex";
-  document.getElementById("savedDot").style.background = hex;
-  document.getElementById("savedHex").textContent = hex;
-}
+// ── Target toggle (Brand / Front Screen) ──────────────────────────────────────
+document.querySelectorAll(".toggle-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".toggle-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    activeTarget = btn.dataset.target;
+    document.getElementById("hexCardLabel").textContent =
+      activeTarget === "brand" ? "Hex Code (Brand Color)" : "Hex Code (Front Screen Color)";
+    applyColor(activeTarget === "brand" ? currentHex : currentFrontHex);
+  });
+});
+
+
 
 // ── Load existing saved color ─────────────────────────────────────────────────
 async function loadSavedColor() {
   if (!restaurantId) return;
   try {
     const snap = await getDoc(doc(db, "restaurants", restaurantId));
-    if (snap.exists() && snap.data().brandColor) {
-      const saved = snap.data().brandColor;
-      showSavedIndicator(saved);
-      applyColor(saved);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data.brandColor) {
+        currentHex = data.brandColor;
+        document.getElementById("colorDot").style.background = currentHex;
+      }
+      if (data.item1Color) {
+        currentFrontHex = data.item1Color;
+      }
+      applyColor(activeTarget === "brand" ? currentHex : currentFrontHex);
     }
   } catch (_) {}
 }
@@ -272,10 +296,10 @@ document.getElementById("saveColorBtn").addEventListener("click", async () => {
 
   try {
     await updateDoc(doc(db, "restaurants", restaurantId), {
-      brandColor: currentHex
+      brandColor: currentHex,
+      item1Color: currentFrontHex
     });
-    showSavedIndicator(currentHex);
-   showToast(`Brand color saved successfully! ${currentHex} ✅`);
+   showToast(`Colors saved successfully! ✅`);
   } catch (err) {
     showToast("Failed to save: " + err.message, true);
   } finally {

@@ -149,6 +149,11 @@
             </div>
           </div>
 
+           <div class="target-toggle" id="targetToggle" style="display:flex;gap:8px;margin-bottom:18px;">
+            <button class="toggle-btn active" data-target="brand">Brand Color</button>
+            <button class="toggle-btn" data-target="front">Front Screen Color</button>
+          </div>
+
           <div class="wheel-container">
             <canvas id="colorCanvas" width="280" height="280"></canvas>
             <div id="wheelCursor"></div>
@@ -185,7 +190,7 @@
 
           <!-- Hex Input -->
           <div class="card hex-card">
-            <div class="section-label-sm">Hex Code</div>
+            <div class="section-label-sm" id="hexCardLabel">Hex Code (Brand Color)</div>
             <div class="hex-input-row">
               <span class="hex-prefix">#</span>
               <input type="text" id="hexInput" maxlength="6" placeholder="FF5F1F" />
@@ -198,6 +203,8 @@
             <div class="section-label-sm">Quick Presets</div>
             <div class="preset-grid" id="presetGrid"></div>
           </div>
+
+          
 
           <!-- Currently Saved -->
           <div class="saved-card" id="savedCard" style="display:none;">

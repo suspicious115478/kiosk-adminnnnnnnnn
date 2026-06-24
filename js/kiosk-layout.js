@@ -159,5 +159,40 @@ saveBtn.addEventListener("click", async () => {
   }
 });
 
+// ── Kitchen receipt toggle ─────────────────────────────────────────────────────
+const receiptToggle = document.getElementById("receiptToggle");
+const receiptTrack  = document.getElementById("receiptTrack");
+const receiptThumb  = document.getElementById("receiptThumb");
+
+function updateReceiptToggleUI(enabled) {
+  receiptTrack.style.background = enabled ? "#16A34A" : "var(--border2)";
+  receiptThumb.style.transform  = enabled ? "translateX(24px)" : "translateX(0)";
+}
+
+// Load current value
+if (restaurantId) {
+  try {
+    const snap = await getDoc(doc(db, "restaurants", restaurantId));
+    if (snap.exists()) {
+      const val = snap.data().kreceipt === true;
+      receiptToggle.checked = val;
+      updateReceiptToggleUI(val);
+    }
+  } catch (_) {}
+}
+
+receiptToggle.addEventListener("change", async () => {
+  const enabled = receiptToggle.checked;
+  updateReceiptToggleUI(enabled);
+  try {
+    await updateDoc(doc(db, "restaurants", restaurantId), { kreceipt: enabled });
+    showToast(enabled ? "Kitchen receipt enabled ✅" : "Kitchen receipt disabled");
+  } catch (err) {
+    showToast("Failed: " + err.message, true);
+    receiptToggle.checked = !enabled;
+    updateReceiptToggleUI(!enabled);
+  }
+});
+
 // ── Init ───────────────────────────────────────────────────────────────────────
 await loadCurrentLayout();

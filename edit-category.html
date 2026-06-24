@@ -196,6 +196,13 @@
       <input type="file" id="editImage" accept="image/*" />
       <img id="editPreview" class="preview-img" alt="Preview" />
     </div>
+    <div class="field">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;">
+        <label style="margin-bottom:0;">Customizations</label>
+        <button type="button" id="editAddCustomBtn" style="font-size:0.72rem;font-weight:600;color:var(--dish-clr);background:var(--dish-bg);border:1px solid var(--dish-brd);border-radius:6px;padding:3px 9px;cursor:pointer;">+ Add</button>
+      </div>
+      <div id="editCustomList"></div>
+    </div>
     <button id="editSaveBtn" class="btn-save">Save Changes</button>
   </div>
 </div>
