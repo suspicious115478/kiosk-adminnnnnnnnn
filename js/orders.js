@@ -187,6 +187,7 @@ function renderOrders(orders, flashIds = []) {
       const newFooter = newCard.querySelector(".order-footer");
       if (oldFooter && newFooter && oldFooter.innerHTML !== newFooter.innerHTML) {
         oldFooter.innerHTML = newFooter.innerHTML;
+        bindFooterListeners(oldCard, order.id, order);
       }
 
       list.appendChild(oldCard);
@@ -199,13 +200,14 @@ function renderOrders(orders, flashIds = []) {
       card.style.transform = "translateY(12px)";
       list.appendChild(card);
 
-      requestAnimationFrame(() => {
+     requestAnimationFrame(() => {
         card.style.transition = "opacity 0.35s ease, transform 0.35s ease";
         card.style.opacity = "1";
         card.style.transform = "translateY(0)";
       });
 
       bindSelectListeners(card, order.id, order);
+      bindFooterListeners(card, order.id, order);
     }
   });
 }
@@ -546,7 +548,7 @@ function buildOrderCard(order, isNew, index) {
       </span>
       ${completionBadgeHtml}
       ${invBadgeHtml}
-      ${payStatus ? `<span class="payment-badge ps-${payStatus.toLowerCase()}">${{"PENDING":"🟡 Pending","SUCCESS":"🟢 Paid","FAILED":"🔴 Failed","CANCELLED":"⚫ Cancelled"}[payStatus]||payStatus}</span>` : ""}
+     ${payStatus ? `<span class="payment-badge ps-${payStatus.toLowerCase()}">${{"PENDING":"🟡 Pending","SUCCESS":"🟢 Paid","FAILED":"🔴 Failed","CANCELLED":"⚫ Cancelled","PAYMENT_AT_COUNTER":"🧾 Pay at Counter"}[payStatus]||payStatus}</span>` : ""}
       <select class="status-select" data-order-id="${order.id}" data-old-status="${status}">
         ${statusOptsHtml}
       </select>
@@ -557,6 +559,11 @@ function buildOrderCard(order, isNew, index) {
       </div>
     </div>
     <div class="order-footer">
+      ${payStatus === "PAYMENT_AT_COUNTER" ? `
+        <button class="mark-paid-btn" data-order-id="${order.id}">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Mark as Paid
+        </button>` : ""}
       <span class="order-total">₹${(total).toFixed(2)}</span>
     </div>
   </div>`;
@@ -601,6 +608,297 @@ function statusLabel(s) {
 
 function statusDot(s) {
   return { NEW: "🟠", PREPARING: "🔵", COMPLETED: "🟢" }[s] || "⚪";
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PAYMENT-AT-COUNTER — Mark as Paid + dual receipt printing
+// ══════════════════════════════════════════════════════════════════════════
+
+function fmtRs(n) { return "Rs." + (Number(n) || 0).toFixed(2); }
+
+function tsToDateParts(ts) {
+  let d;
+  try { d = ts?.toDate ? ts.toDate() : new Date(ts || Date.now()); }
+  catch (_) { d = new Date(); }
+  return {
+    dateStr: d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+    timeStr: d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }),
+  };
+}
+
+function bindFooterListeners(card, orderId, orderData) {
+  const btn = card.querySelector(".mark-paid-btn");
+  if (!btn) return;
+  btn.addEventListener("click", () => markAsPaidAndPrint(orderId, orderData, btn));
+}
+
+async function markAsPaidAndPrint(orderId, order, btnEl) {
+  const btn = btnEl || document.querySelector(`.mark-paid-btn[data-order-id="${orderId}"]`);
+  if (btn) { btn.disabled = true; btn.textContent = "Marking..."; }
+  try {
+    await updateDoc(
+      doc(db, "restaurants", restaurantId, "orders", orderId),
+            { paymentStatus: "SUCCESS", paidAtCounterMarkedAt: Date.now(), kitchenPrintStatus: "PENDING" }
+    );
+    showToast("Marked as paid ✅ Kitchen receipt kiosk se print hogi");
+  } catch (err) {
+    showToast("Failed to mark as paid: " + err.message, true);
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Mark as Paid`;
+    }
+  }
+}
+
+// ── Dual print: customer copy, then kitchen copy ──────────────────────────────
+function printCounterReceipts(order) {
+  const SCALE = 2;
+  const PW    = 576;
+  const CW    = PW * SCALE;
+  const PAD   = 16 * SCALE;
+
+  printReceiptCanvas(buildCounterReceiptLines(order, false, CW, PAD), CW, PAD);
+  setTimeout(() => {
+    printReceiptCanvas(buildCounterReceiptLines(order, true, CW, PAD), CW, PAD);
+  }, 1500);
+}
+
+function buildCounterReceiptLines(order, isKitchen, CW, PAD) {
+  const items    = order.items || [];
+  const shortId  = (order.orderId || order.id || "").slice(0, 6).toUpperCase();
+  const { dateStr, timeStr } = tsToDateParts(order.createdAt);
+  const typeStr  = { DINE_IN: "Dine In", TAKEAWAY: "Takeaway", KIOSK: "Kiosk" }[order.orderType] || order.orderType || "";
+  const subtotal   = order.subtotal   || 0;
+  const taxAmt     = order.tax        || 0;
+  const serviceAmt = order.service    || 0;
+  const packingAmt = order.packing    || 0;
+  const otherAmt   = order.other      || 0;
+  const grandTotal = order.totalPrice || 0;
+
+  const SCALE = 4; // internal sizing scale — matches web-order.js print engine
+  const dummy = document.createElement("canvas");
+  dummy.width = CW; dummy.height = 100;
+  const dCtx  = dummy.getContext("2d");
+
+  const lines = [];
+  const add = (type, data) => {
+    if (type === "cols3") {
+      const font = `${data.bold ? "bold " : ""}${data.size}px "Courier New"`;
+      const c2c3Width = dCtx.measureText(data.c2).width + dCtx.measureText(data.c3).width + (16 * SCALE);
+      const c1MaxW = Math.max((CW - PAD * 2) - c2c3Width - (16 * SCALE), 20 * SCALE);
+      data.c1Lines = wrapTextForReceipt(dCtx, data.c1, c1MaxW, font);
+      data.h = data.h * data.c1Lines.length;
+    } else if (type === "cols2") {
+      const font = `${data.bold ? "bold " : ""}${data.size}px "Courier New"`;
+      const c2Width = dCtx.measureText(data.c2).width;
+      const c1MaxW = Math.max((CW - PAD * 2) - c2Width - (16 * SCALE), 20 * SCALE);
+      data.c1Lines = wrapTextForReceipt(dCtx, data.c1, c1MaxW, font);
+      data.h = data.h * data.c1Lines.length;
+    } else if (type === "text") {
+      const font = `${data.bold ? "bold " : ""}${data.size}px "Courier New"`;
+      data.textLines = wrapTextForReceipt(dCtx, data.text, CW - PAD * 2, font);
+      if (data.textLines.length > 1) data.h = data.h * data.textLines.length;
+    }
+    lines.push({ type, ...data });
+  };
+
+  add("text", { text: (name || "RESTAURANT").toUpperCase(), size: 28 * SCALE, bold: true, align: "center", h: 38 * SCALE });
+  add("gap",  { h: 6 * SCALE });
+  add("line", { h: 3 * SCALE, style: "solid" });
+  add("gap",  { h: 8 * SCALE });
+
+  if (isKitchen) {
+    add("text", { text: "** KITCHEN COPY **", size: 20 * SCALE, bold: true, align: "center", h: 30 * SCALE });
+    add("gap",  { h: 6 * SCALE });
+  }
+
+  add("text", { text: `Date  : ${dateStr}  ${timeStr}`, size: 17 * SCALE, align: "left", h: 24 * SCALE });
+  add("text", { text: `Order : #${shortId}`,            size: 17 * SCALE, align: "left", h: 24 * SCALE });
+  add("text", { text: `Type  : ${typeStr}`,              size: 17 * SCALE, align: "left", h: 24 * SCALE });
+
+  if (!isKitchen) {
+    add("gap",  { h: 6 * SCALE });
+    add("line", { h: 2 * SCALE, style: "dashed" });
+    add("gap",  { h: 6 * SCALE });
+    add("text", { text: "PAYMENT AT COUNTER", size: 19 * SCALE, bold: true, align: "center", h: 28 * SCALE });
+  }
+
+  add("gap",  { h: 6 * SCALE });
+  add("line", { h: 2 * SCALE, style: "dashed" });
+  add("gap",  { h: 6 * SCALE });
+
+  if (isKitchen) {
+    add("cols2", { c1: "ITEM", c2: "QTY", size: 17 * SCALE, bold: true, h: 26 * SCALE });
+    add("line", { h: 2 * SCALE, style: "dashed" });
+    add("gap",  { h: 4 * SCALE });
+    for (const item of items) {
+      add("cols2", { c1: item.name, c2: `x${item.qty ?? item.quantity ?? 1}`, size: 17 * SCALE, bold: false, h: 25 * SCALE });
+    }
+    add("gap",  { h: 10 * SCALE });
+    add("line", { h: 3 * SCALE, style: "solid" });
+  } else {
+    add("cols3", { c1: "ITEM", c2: "QTY", c3: "AMOUNT", size: 17 * SCALE, bold: true, h: 26 * SCALE });
+    add("line", { h: 2 * SCALE, style: "dashed" });
+    add("gap",  { h: 4 * SCALE });
+    for (const item of items) {
+      const qty   = item.qty ?? item.quantity ?? 1;
+      const total = `Rs.${((item.price || 0) * qty).toFixed(2)}`;
+      add("cols3", { c1: item.name, c2: `x${qty}`, c3: total, size: 17 * SCALE, bold: false, h: 25 * SCALE });
+    }
+
+    add("gap",  { h: 4 * SCALE });
+    add("line", { h: 2 * SCALE, style: "dashed" });
+    add("gap",  { h: 6 * SCALE });
+
+    add("cols2", { c1: "Subtotal", c2: fmtRs(subtotal), size: 17 * SCALE, bold: false, h: 25 * SCALE });
+    if (taxAmt     > 0) add("cols2", { c1: "Tax",            c2: fmtRs(taxAmt),     size: 17 * SCALE, bold: false, h: 25 * SCALE });
+    if (serviceAmt > 0) add("cols2", { c1: "Service Charge", c2: fmtRs(serviceAmt), size: 17 * SCALE, bold: false, h: 25 * SCALE });
+    if (packingAmt > 0) add("cols2", { c1: "Packing Charge", c2: fmtRs(packingAmt), size: 17 * SCALE, bold: false, h: 25 * SCALE });
+    if (otherAmt   > 0) add("cols2", { c1: "Other Charges",  c2: fmtRs(otherAmt),   size: 17 * SCALE, bold: false, h: 25 * SCALE });
+
+    add("gap",  { h: 4 * SCALE });
+    add("line", { h: 3 * SCALE, style: "solid" });
+    add("gap",  { h: 8 * SCALE });
+
+    add("cols2", { c1: "TOTAL", c2: fmtRs(grandTotal), size: 26 * SCALE, bold: true, h: 38 * SCALE });
+
+    add("gap",  { h: 4 * SCALE });
+    add("line", { h: 3 * SCALE, style: "solid" });
+    add("gap",  { h: 14 * SCALE });
+
+    add("text", { text: "PLEASE PAY AT COUNTER", size: 18 * SCALE, bold: true, align: "center", h: 26 * SCALE });
+    add("text", { text: "Thank you! Visit again.", size: 17 * SCALE, align: "center", h: 26 * SCALE });
+  }
+
+  add("gap", { h: 40 * SCALE });
+  return lines;
+}
+
+function wrapTextForReceipt(ctx, text, maxWidth, font) {
+  ctx.font = font;
+  const words = String(text ?? "").split(" ");
+  const out = [];
+  let cur = "";
+  for (const w of words) {
+    const test = cur ? cur + " " + w : w;
+    if (ctx.measureText(test).width > maxWidth && cur) { out.push(cur); cur = w; }
+    else { cur = test; }
+  }
+  if (cur) out.push(cur);
+  const final = [];
+  for (const line of out) {
+    if (ctx.measureText(line).width > maxWidth) {
+      let chunk = "";
+      for (const ch of line) {
+        if (ctx.measureText(chunk + ch).width > maxWidth && chunk) { final.push(chunk); chunk = ch; }
+        else { chunk += ch; }
+      }
+      if (chunk) final.push(chunk);
+    } else { final.push(line); }
+  }
+  return final.length ? final : [""];
+}
+
+function drawReceiptLine(ctx, line, y, CW, PAD, FONT, SCALE) {
+  ctx.fillStyle = "#000000";
+  if (line.type === "gap") return;
+
+  if (line.type === "line") {
+    ctx.save();
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = line.style === "solid" ? 2 * SCALE : 1 * SCALE;
+    ctx.setLineDash(line.style === "dashed" ? [6 * SCALE, 4 * SCALE] : []);
+    ctx.beginPath();
+    ctx.moveTo(PAD, y + line.h / 2);
+    ctx.lineTo(CW - PAD, y + line.h / 2);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
+  if (line.type === "text") {
+    ctx.font = `${line.bold ? "bold " : ""}${line.size}px "${FONT}"`;
+    ctx.textBaseline = "middle";
+    const textLines = line.textLines || [line.text];
+    const subH = line.h / textLines.length;
+    textLines.forEach((t, i) => {
+      const textY = y + subH * i + subH / 2;
+      if (line.align === "center") { ctx.textAlign = "center"; ctx.fillText(t, CW / 2, textY); }
+      else { ctx.textAlign = "left"; ctx.fillText(t, PAD, textY); }
+    });
+    return;
+  }
+
+  if (line.type === "cols2") {
+    ctx.font = `${line.bold ? "bold " : ""}${line.size}px "${FONT}"`;
+    ctx.textBaseline = "middle";
+    const c1Lines = line.c1Lines || [line.c1];
+    const subH = line.h / c1Lines.length;
+    ctx.textAlign = "left";
+    c1Lines.forEach((t, i) => ctx.fillText(t, PAD, y + subH * i + subH / 2));
+    ctx.textAlign = "right";
+    ctx.fillText(line.c2, CW - PAD, y + line.h / 2);
+    return;
+  }
+
+  if (line.type === "cols3") {
+    ctx.font = `${line.bold ? "bold " : ""}${line.size}px "${FONT}"`;
+    ctx.textBaseline = "middle";
+    const c1Lines = line.c1Lines || [line.c1];
+    const subH = line.h / c1Lines.length;
+    ctx.textAlign = "left";
+    c1Lines.forEach((t, i) => ctx.fillText(t, PAD, y + subH * i + subH / 2));
+    const centerY = y + line.h / 2;
+    ctx.textAlign = "right";
+    ctx.fillText(line.c3, CW - PAD, centerY);
+    const c3Width = ctx.measureText(line.c3).width;
+    const gap = 16 * SCALE;
+    ctx.fillText(line.c2, CW - PAD - c3Width - gap, centerY);
+    return;
+  }
+}
+
+function printReceiptCanvas(lines, CW, PAD) {
+  const SCALE = 2;
+  const FONT  = "Courier New";
+  const totalH = lines.reduce((s, l) => s + l.h, 0) + (60 * SCALE);
+
+  const canvas  = document.createElement("canvas");
+  canvas.width  = CW;
+  canvas.height = totalH;
+  const ctx     = canvas.getContext("2d");
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, CW, totalH);
+
+  let y = 20 * SCALE;
+  for (const line of lines) {
+    drawReceiptLine(ctx, line, y, CW, PAD, FONT, SCALE);
+    y += line.h;
+  }
+
+  const imgData = canvas.toDataURL("image/png");
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/><style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#fff; }
+  img { width: 48mm; display:block; margin:0; image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast; }
+  @media print { body{margin:0;padding:0;} img{width:48mm;} @page{ size:58mm auto; margin:0mm; } }
+</style></head><body>
+  <img src="${imgData}" />
+  <script>
+    window.onload = function() {
+      setTimeout(function(){ window.print(); setTimeout(function(){ window.close(); }, 1000); }, 300);
+    };
+  <\/script>
+</body></html>`;
+
+  const popup = window.open("", "_blank", "width=420,height=700");
+  if (!popup) { showToast("⚠️ Popup blocked! Browser settings mein popup allow karo.", true); return; }
+  popup.document.open();
+  popup.document.write(html);
+  popup.document.close();
 }
 
 startLiveListener();
