@@ -55,6 +55,24 @@ let currentMode   = "live";
 let unsubscribeFn = null;
 let knownOrderIds = new Set();
 let stockMode = "manual"; // default safe
+let payFilter  = "ALL";   // ALL | UPI | CASH
+let lastOrders = [];      // filter badalne pe re-render ke liye
+
+function getPayMethod(order) {
+  if (order.paidAtCounterMarkedAt || order.paymentStatus === "PAYMENT_AT_COUNTER")
+    return { key: "CASH", cls: "pm-cash", label: "💵 Cash" };
+  if (order.qrId || order.paymentId)
+    return { key: "UPI", cls: "pm-upi", label: "📱 UPI" };
+  return { key: "NONE", cls: "pm-none", label: "⏳ Not chosen" };
+}
+
+document.querySelectorAll(".pf-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    payFilter = btn.dataset.pay;
+    document.querySelectorAll(".pf-btn").forEach(b => b.classList.toggle("active", b === btn));
+    renderOrders(lastOrders);
+  });
+});
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 document.getElementById("tabLive").addEventListener("click", () => {
@@ -131,7 +149,11 @@ async function loadByDate(dateStr) {
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
-function renderOrders(orders, flashIds = []) {
+function renderOrders(allOrders, flashIds = []) {
+  lastOrders = allOrders;
+  const orders = payFilter === "ALL"
+    ? allOrders
+    : allOrders.filter(o => getPayMethod(o).key === payFilter);
   updateSummary(orders);
 
   const list = document.getElementById("ordersList");
@@ -494,7 +516,10 @@ function buildOrderCard(order, isNew, index) {
   const total     = order.totalPrice || 0;
   const shortId   = (order.orderId || order.id || "").slice(0, 6).toUpperCase();
   const timeStr   = formatTime(order.createdAt);
-  const payStatus = order.paymentStatus || null;
+    const payStatus = order.paymentStatus || null;
+
+  // Payment method chip (hamesha dikhega)
+    const payMethod = getPayMethod(order);
 
   const typeLabel     = { DINE_IN: "Dine In", TAKEAWAY: "Takeaway", KIOSK: "Kiosk" }[orderType] || orderType;
   const statusOptions = ["NEW", "PREPARING", "COMPLETED"];
@@ -542,7 +567,8 @@ function buildOrderCard(order, isNew, index) {
   <div class="order-card status-${status} ${isNew ? "new-flash" : ""}" data-id="${order.id}" style="animation-delay:${index * 40}ms">
     <div class="order-header">
       <div class="order-id">#${shortId}<span>${timeStr}</span></div>
-      <span class="order-type-badge type-${orderType}">${typeLabel}</span>
+           <span class="order-type-badge type-${orderType}">${typeLabel}</span>
+      <span class="pay-method-badge ${payMethod.cls}">${payMethod.label}</span>
       <span class="status-badge-pill s-${status}">
         ${statusDot(status)} ${statusLabel(status)}
       </span>
@@ -638,9 +664,10 @@ async function markAsPaidAndPrint(orderId, order, btnEl) {
   try {
     await updateDoc(
       doc(db, "restaurants", restaurantId, "orders", orderId),
-            { paymentStatus: "SUCCESS", paidAtCounterMarkedAt: Date.now(), kitchenPrintStatus: "PENDING" }
+      { paymentStatus: "SUCCESS", paidAtCounterMarkedAt: Date.now() }
     );
-    showToast("Marked as paid ✅ Kitchen receipt kiosk se print hogi");
+    showToast("Marked as paid ✅ Printing receipts...");
+    printCounterReceipts(order);
   } catch (err) {
     showToast("Failed to mark as paid: " + err.message, true);
     if (btn) {
