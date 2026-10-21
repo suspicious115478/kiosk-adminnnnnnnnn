@@ -664,10 +664,9 @@ async function markAsPaidAndPrint(orderId, order, btnEl) {
   try {
     await updateDoc(
       doc(db, "restaurants", restaurantId, "orders", orderId),
-      { paymentStatus: "SUCCESS", paidAtCounterMarkedAt: Date.now() }
+      { paymentStatus: "SUCCESS", paidAtCounterMarkedAt: Date.now(), kitchenPrintStatus: "PENDING" }
     );
-    showToast("Marked as paid ✅ Printing receipts...");
-    printCounterReceipts(order);
+    showToast("Marked as paid ✅ Kitchen receipt kiosk se print hogi");
   } catch (err) {
     showToast("Failed to mark as paid: " + err.message, true);
     if (btn) {
