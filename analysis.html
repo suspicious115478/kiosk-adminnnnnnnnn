@@ -152,7 +152,27 @@
           <input type="date" id="rangeStart" />
           <span class="date-sep">to</span>
           <input type="date" id="rangeEnd" />
-          <button class="apply-btn" id="applyRange">Apply</button>
+                   <button class="apply-btn" id="applyRange">Apply</button>
+        </div>
+
+        <!-- Order type filter -->
+        <div class="filter-group">
+          <span class="filter-label">Type</span>
+          <div class="tab-row">
+            <button class="tab-btn type-btn active" data-type="ALL">All</button>
+            <button class="tab-btn type-btn" data-type="DINE_IN">🍽️ Dine In</button>
+            <button class="tab-btn type-btn" data-type="TAKEAWAY">🥡 Takeaway</button>
+          </div>
+        </div>
+
+        <!-- Payment method filter -->
+        <div class="filter-group">
+          <span class="filter-label">Payment</span>
+          <div class="tab-row">
+            <button class="tab-btn pay-btn active" data-pay="ALL">All</button>
+            <button class="tab-btn pay-btn" data-pay="UPI">📱 UPI</button>
+            <button class="tab-btn pay-btn" data-pay="CASH">🧾 Pay at Counter</button>
+          </div>
         </div>
 
       </div>
