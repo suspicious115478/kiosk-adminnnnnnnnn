@@ -50,6 +50,8 @@ if (restaurantId) {
 let currentMode   = "all";   // "all" | "single" | "range"
 let currentSort   = "qty";   // "qty" | "revenue" | "prep"
 let cachedOrders  = [];
+let typeFilter    = "ALL";   // "ALL" | "DINE_IN" | "TAKEAWAY"
+let payFilter     = "ALL";   // "ALL" | "UPI" | "CASH"
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 document.getElementById("tabAllTime").addEventListener("click", () => switchTab("all"));
@@ -112,6 +114,37 @@ document.querySelectorAll(".sort-btn").forEach(btn => {
   });
 });
 
+// ── Type / Payment filters ────────────────────────────────────────────────────
+function getPayKey(order) {
+  if (order.paidAtCounterMarkedAt || order.paymentStatus === "PAYMENT_AT_COUNTER") return "CASH";
+  if (order.qrId || order.paymentId) return "UPI";
+  return "NONE";
+}
+
+function applyFilters(orders) {
+  return orders.filter(o => {
+    if (typeFilter !== "ALL" && (o.orderType || "KIOSK") !== typeFilter) return false;
+    if (payFilter  !== "ALL" && getPayKey(o) !== payFilter) return false;
+    return true;
+  });
+}
+
+document.querySelectorAll(".type-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    typeFilter = btn.dataset.type;
+    document.querySelectorAll(".type-btn").forEach(b => b.classList.toggle("active", b === btn));
+    renderAnalysis(cachedOrders);
+  });
+});
+
+document.querySelectorAll(".pay-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    payFilter = btn.dataset.pay;
+    document.querySelectorAll(".pay-btn").forEach(b => b.classList.toggle("active", b === btn));
+    renderAnalysis(cachedOrders);
+  });
+});
+
 // ── Load orders from Firestore ────────────────────────────────────────────────
 let _ordersUnsub = null;
 
@@ -157,6 +190,7 @@ function loadOrders(startDate, endDate) {
 
 // ── Main render ───────────────────────────────────────────────────────────────
 function renderAnalysis(orders) {
+  orders = applyFilters(orders);   // type + payment filter
   // Aggregate item stats
   const itemMap = {}; // key: item name
 
