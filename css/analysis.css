@@ -266,6 +266,12 @@ body::before {
 }
 .apply-btn:hover { background: #0369A1; }
 
+.filter-group { display: flex; align-items: center; gap: 8px; }
+.filter-label {
+  font-size: 0.67rem; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted);
+}
+
 /* ── HIGHLIGHTS ROW ── */
 .highlights-row {
   display: grid;
