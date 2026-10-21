@@ -170,6 +170,14 @@
         <span class="live-badge"><span class="pulse-dot"></span> Listening for new orders...</span>
       </div> -->
 
+            <!-- Payment method filter -->
+      <div class="pay-filter-row fade-up" style="animation-delay:0.08s">
+        <span class="pf-label">Payment</span>
+        <button class="pf-btn active" data-pay="ALL">All</button>
+        <button class="pf-btn" data-pay="UPI">📱 UPI</button>
+        <button class="pf-btn" data-pay="CASH">💵 Cash</button>
+      </div>
+
       <!-- Date picker -->
       <div id="datePickerRow" class="date-row fade-up" style="display:none; animation-delay:0.1s">
         <input type="date" id="datePicker" />
@@ -214,6 +222,10 @@
 
 <div class="toast" id="toast"></div>
 <script type="module" src="./js/orders.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js');
+}
+</script>
 </body>
 </html>
-
