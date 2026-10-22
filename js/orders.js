@@ -598,8 +598,11 @@ function buildOrderCard(order, isNew, index) {
 // ── Summary bar ───────────────────────────────────────────────────────────────
 function updateSummary(orders) {
   document.getElementById("sumTotal").textContent    = orders.length;
-  document.getElementById("sumRevenue").textContent  =
-    "₹" + orders.reduce((s, o) => s + (o.totalPrice || 0), 0).toFixed(2);
+   document.getElementById("sumRevenue").textContent  =
+    "₹" + orders
+      .filter(o => o.paymentStatus === "SUCCESS")
+      .reduce((s, o) => s + (o.totalPrice || 0), 0)
+      .toFixed(2);
   document.getElementById("sumNew").textContent      = orders.filter(o => o.status === "NEW").length;
   document.getElementById("sumPrep").textContent     = orders.filter(o => o.status === "PREPARING").length;
   document.getElementById("sumDone").textContent     = orders.filter(o => o.status === "COMPLETED").length;
